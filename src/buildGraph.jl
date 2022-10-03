@@ -12,6 +12,13 @@ function is_end_node(g, index)
     end
 end
 
+function point_on_radius(x, y, r)
+    ϕ = rand() * 2π
+    dx = r * cos.([ϕ, ϕ+π/3])
+    dy = r * sin.([ϕ, ϕ+π/3])
+    return x.+dx, y.+dy
+end
+
 function add_node_with_data!(g, n; data=Dict())
     add_vertex!(g)
     for (key,value) in data
@@ -23,6 +30,16 @@ end
 function add_edge_with_data!(g, s, d; data=())
     if s == d  # if we are about to add a self-loop
         @warn "trying to add self loop for node $(get_prop(g, s, :osm_id)) ($s)"
+        lat_start = get_prop(g, s, :lat)
+        lon_start = get_prop(g, s, :lon)
+        lons, lats= point_on_radius(lon_start, lat_start, 0.0003)
+        add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[1], :lon=>lons[1], :end=>false))
+        id_1 =nv(g)
+        add_edge!(g, s, id_1, :helper, true)
+        add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[2], :lon=>lons[2], :end=>false))
+        id_2 = nv(g)
+        add_edge!(g, id_2, d, :helper, true)
+        add_edge!(g, id_1, id_2)
     else
         if has_edge(g, s, d)
             @warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
@@ -39,7 +56,8 @@ function add_edge_with_data!(g, s, d; data=())
             lat_new = lat_center + scale * delta_lon
             lon_new = lon_center - scale * delta_lat
             add_vertex!(g, Dict(:osm_id=>0, :lat=>lat_new, :lon=>lon_new, :end=>false))
-            # add edges to vertex...
+            add_edge!(g, s, nv(g), :helper, true)
+            add_edge!(g, nv(g), d)
         else
             add_edge!(g, s, d)
         end
