@@ -19,6 +19,21 @@ function point_on_radius(x, y, r)
     return x.+dx, y.+dy
 end
 
+function offset_point_between(g, s, d)
+    lat_start = get_prop(g, s, :lat)
+    lon_start = get_prop(g, s, :lon)
+    lat_dest = get_prop(g, d, :lat)
+    lon_dest = get_prop(g, d, :lon)
+    delta_lat = (lat_dest-lat_start)
+    delta_lon = (lon_dest-lon_start)
+    lat_center = (lat_start + lat_dest) / 2
+    lon_center = (lon_start + lon_dest) / 2
+    scale = 0.5 * rand() + 0.1
+    lat_new = lat_center + scale * delta_lon
+    lon_new = lon_center - scale * delta_lat
+    return lon_new, lat_new
+end
+
 function add_node_with_data!(g, n; data=Dict())
     add_vertex!(g)
     for (key,value) in data
@@ -27,9 +42,9 @@ function add_node_with_data!(g, n; data=Dict())
 end
 
 
-function add_edge_with_data!(g, s, d; data=())
+function add_edge_with_data!(g, s, d; data=Dict())
     if s == d  # if we are about to add a self-loop
-        @warn "trying to add self loop for node $(get_prop(g, s, :osm_id)) ($s)"
+        #@warn "trying to add self loop for node $(get_prop(g, s, :osm_id)) ($s)"
         lat_start = get_prop(g, s, :lat)
         lon_start = get_prop(g, s, :lon)
         lons, lats= point_on_radius(lon_start, lat_start, 0.0003)
@@ -39,27 +54,20 @@ function add_edge_with_data!(g, s, d; data=())
         add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[2], :lon=>lons[2], :end=>false))
         id_2 = nv(g)
         add_edge!(g, id_2, d, :helper, true)
-        add_edge!(g, id_1, id_2)
+        add_edge_with_data!(g, id_1, id_2; data=data)
     else
         if has_edge(g, s, d)
-            @warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
+            #@warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
             # all of this is bad...
-            lat_start = get_prop(g, s, :lat)
-            lon_start = get_prop(g, s, :lon)
-            lat_dest = get_prop(g, d, :lat)
-            lon_dest = get_prop(g, d, :lon)
-            delta_lat = (lat_dest-lat_start)
-            delta_lon = (lon_dest-lon_start)
-            lat_center = (lat_start + lat_dest) / 2
-            lon_center = (lon_start + lon_dest) / 2
-            scale = 0.5 * rand() + 0.1
-            lat_new = lat_center + scale * delta_lon
-            lon_new = lon_center - scale * delta_lat
+            lon_new, lat_new = offset_point_between(g, s, d)
             add_vertex!(g, Dict(:osm_id=>0, :lat=>lat_new, :lon=>lon_new, :end=>false))
             add_edge!(g, s, nv(g), :helper, true)
-            add_edge!(g, nv(g), d)
+            add_edge_with_data!(g, nv(g), d; data=data)
         else
             add_edge!(g, s, d)
+            for (key, value) in data
+                set_prop!(g, s, d, key, value)
+            end
         end
     end
 end
@@ -68,6 +76,7 @@ is_circular_way(way::Way) = way.nodes[1] == way.nodes[end]
 
 function get_neighbor_indices(way::Way, start_id_index, nodes_in_nav_graph)
     next_osm_ids = []
+    used_directions = []
     if way.tags["oneway"]
         step_directions = way.tags["reverseway"] ? [-1] : [1]
     else
@@ -77,12 +86,14 @@ function get_neighbor_indices(way::Way, start_id_index, nodes_in_nav_graph)
         next_index = start_id_index + step_direction
         if 1<= next_index <= length(nodes_in_nav_graph)
             push!(next_osm_ids, nodes_in_nav_graph[next_index])
+            push!(used_directions, step_direction)
         elseif is_circular_way(way)
             corrected_index = mod(next_index - 1, length(nodes_in_nav_graph)) + 1
             push!(next_osm_ids, nodes_in_nav_graph[corrected_index])
+            push!(used_directions, step_direction)
         end
     end
-    return next_osm_ids
+    return next_osm_ids, used_directions
 end
 
 function is_lolipop_node(g, osm_id)
@@ -94,6 +105,40 @@ function is_lolipop_node(g, osm_id)
     return ocurrences == 2 && !is_circular_way(way)
 end
 
+function get_node_list(way, start_pos, dest_osm_id, direction)
+    nodes = way.nodes
+    string_nodes = [nodes[start_pos]]
+    current_pos = mod(start_pos + direction - 1, length(way.nodes)) + 1
+    while nodes[current_pos] != dest_osm_id
+        # exclude duplicates where rings close
+        if !(way.nodes[current_pos] in string_nodes)
+            push!(string_nodes, way.nodes[current_pos])
+        end
+        current_pos = mod(current_pos + direction - 1, length(way.nodes)) + 1
+    end
+    push!(string_nodes, way.nodes[current_pos])
+    return string_nodes
+end
+
+function geolinestring(way, start_osm_id, dest_osm_id, direction)
+    # find start and end index in way.nodes and take everything in between
+    start_pos = findall(x->x==start_osm_id, way.nodes)
+     
+    if length(start_pos) == 1
+        start_pos = first(start_pos)
+        string_nodes = get_node_list(way, start_pos, dest_osm_id, direction)
+    else
+        length(start_pos) > 2 && @warn "the start node $start_osm_id apears $(length(start_pos)) times in the way."
+        # this assumes, that nodes occure at most twice in every way
+        if start_osm_id == dest_osm_id
+            string_nodes = way.nodes[start_pos[1]:start_pos[end]]
+        else  # this is for everything else, I assume that if I start from both nodes in the right direction, the shorter path will be the one I want...
+            node_lists = [get_node_list(way, start, dest_osm_id, direction) for start in start_pos]
+            string_nodes = node_lists[findmin(length, node_lists)[2]]
+        end
+    end
+    return string_nodes
+end
 
 """
 This is the final function getting called on shadow graph creation.
@@ -103,7 +148,7 @@ it to the graph we want to have. (whatever that may be...)
 function shadow_graph_from_light_osm_graph(g) 
     # make the streets nodes are a part contain only unique elements
     g.node_to_way = Dict(key => collect(Set(value)) for (key, value) in g.node_to_way)
-    # build clean graph containing only nodes for crossing streets
+    # build clean graph containing only nodes for topologically relevant nodes
     g_nav = MetaDiGraph()
 
     # add only those nodes, which are part of two or more ways or ends of streets
@@ -111,11 +156,16 @@ function shadow_graph_from_light_osm_graph(g)
     for (osm_id, ways) in g.node_to_way
         index = g.node_to_index[osm_id]
         if length(ways) > 1 || is_end_node(g.graph, index) || is_lolipop_node(g, osm_id)
+            lat_point = g.nodes[osm_id].location.lat
+            lon_point = g.nodes[osm_id].location.lon
+            point = ArchGDAL.createpoint(lon_point, lat_point)
+            apply_wsg_84!(point)
             data = Dict(
                 :(osm_id) => osm_id,
-                :lat => g.nodes[osm_id].location.lat,
-                :lon => g.nodes[osm_id].location.lon,
-                :end => is_end_node(g.graph, index)
+                :lat => lat_point,
+                :lon => lon_point,
+                :end => is_end_node(g.graph, index),
+                :geopoint=>point
             )
             add_node_with_data!(g_nav, current_new_index; data=data)
             current_new_index += 1
@@ -124,10 +174,10 @@ function shadow_graph_from_light_osm_graph(g)
 
     osm_id_to_nav_id = Dict(get_prop(g_nav, i, :osm_id)=>i for i in vertices(g_nav))
     osm_ids = collect(keys(osm_id_to_nav_id))
-    #@showprogress 0.5 "rebuilding topology" 
-    for nav_node in vertices(g_nav)
+    #@showprogress 0.5 "rebuilding topology"
+    for start_node_id in vertices(g_nav)
         # get ways this node is part of
-        start_osm_id = get_prop(g_nav, nav_node, :osm_id)
+        start_osm_id = get_prop(g_nav, start_node_id, :osm_id)
         ways = [g.ways[way_id] for way_id in g.node_to_way[start_osm_id]]
         for way in ways
             nodes_in_nav_graph = [node for node in way.nodes if node in osm_ids]
@@ -143,10 +193,16 @@ function shadow_graph_from_light_osm_graph(g)
             end
 
             for start_id_index in start_id_indices
-                neighbor_indices = get_neighbor_indices(way, start_id_index, nodes_in_nav_graph)
-                for next_osm_id in neighbor_indices
+                neighbor_indices, step_directions = get_neighbor_indices(way, start_id_index, nodes_in_nav_graph)
+                for (next_osm_id, step_direction) in zip(neighbor_indices, step_directions)
                     next_nav_id = osm_id_to_nav_id[next_osm_id]
-                    add_edge_with_data!(g_nav, nav_node, next_nav_id)
+                    linestring = geolinestring(way, start_osm_id, next_osm_id, step_direction)
+                    data = Dict(
+                        :(osm_id) => way.id,
+                        :geolinestring => linestring,
+                        :geomlength => 0
+                    )
+                    add_edge_with_data!(g_nav, start_node_id, next_nav_id; data=data)
                 end
             end
         end
