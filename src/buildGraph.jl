@@ -120,7 +120,7 @@ function get_node_list(way, start_pos, dest_osm_id, direction)
     return string_nodes
 end
 
-function geolinestring(way, start_osm_id, dest_osm_id, direction)
+function nodelist_between(way, start_osm_id, dest_osm_id, direction)
     # find start and end index in way.nodes and take everything in between
     start_pos = findall(x->x==start_osm_id, way.nodes)
      
@@ -133,11 +133,20 @@ function geolinestring(way, start_osm_id, dest_osm_id, direction)
         if start_osm_id == dest_osm_id
             string_nodes = way.nodes[start_pos[1]:start_pos[end]]
         else  # this is for everything else, I assume that if I start from both nodes in the right direction, the shorter path will be the one I want...
+            # the longer I think about it, this might actually be generally correct for all cases in this clause, due to the one dimensionality of ways.
             node_lists = [get_node_list(way, start, dest_osm_id, direction) for start in start_pos]
             string_nodes = node_lists[findmin(length, node_lists)[2]]
         end
     end
     return string_nodes
+end
+
+function geolinestring(nodes, node_id_list)
+    nodelist = [nodes[id] for id in node_id_list]
+    location_tuples = [(node.location.lon, i.location.lat) for node in nodelist]
+    linestring = ArchGDAL.createlinestring(location_tuples)
+    apply_wsg_84!(linestring)
+    return linestring
 end
 
 """
@@ -196,7 +205,8 @@ function shadow_graph_from_light_osm_graph(g)
                 neighbor_indices, step_directions = get_neighbor_indices(way, start_id_index, nodes_in_nav_graph)
                 for (next_osm_id, step_direction) in zip(neighbor_indices, step_directions)
                     next_nav_id = osm_id_to_nav_id[next_osm_id]
-                    linestring = geolinestring(way, start_osm_id, next_osm_id, step_direction)
+                    node_id_list = nodelist_between(way, start_osm_id, next_osm_id, step_direction)
+                    linestring = geolinestring(g.nodes, node_id_list)
                     data = Dict(
                         :(osm_id) => way.id,
                         :geolinestring => linestring,
