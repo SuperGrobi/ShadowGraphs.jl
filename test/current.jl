@@ -5,9 +5,12 @@ using GraphPlot
 using Compose
 using MetaGraphs
 using Plots
+using GeoInterface
 using GraphRecipes
+using ArchGDAL
 using PyCall
 using Colors
+using WebIO
 flm = pyimport("folium")
 
 struct FoliumDrawer
@@ -139,7 +142,61 @@ g = SimpleDiGraph(4)
 for i in vertices(g)
     add_vertex!(g)
 end
-
+hasproperty
+has_prop
 g
 
+begin
+    points = [get_prop(g_nav, i, :geopoint) for i in vertices(g_nav) if has_prop(g_nav, i, :geopoint)]
+    layer = Leaflet.Layer.(points)
+    provider = Leaflet.CARTO(:dark_nolabels)
+m = Leaflet.Map(; layers=layer, provider=provider, zoom=3, height=1000, center=[30.0, 120.0]);
+w = Blink.Window()
+body!(w, m)
+end
+
 fieldnames(Way)
+
+using Leaflet
+using Blink
+provider = Leaflet.CARTO(:dark_nolabels)
+m = Leaflet.Map(; layers=Leaflet.Layer[], provider=provider, zoom=3, height=1000, center=[30.0, 120.0])
+
+w = Blink.Window()
+body!(w, m)
+
+m
+WebIO.render(m)
+m.scope.dom
+
+fieldnames(Leaflet.Map)
+
+a = WebIO.render(m)
+typeof(a)
+
+fieldnames(WebIO.Node)
+
+
+cons(h, t) = w -> w ? h : t
+x = cons(1, cons(2, cons(3, nothing)))
+
+x(false)(false)(true)
+
+function nth(l, n)
+    if n==1
+        return l(true)
+    else
+        return nth(l(false), n-1)
+    end
+end
+
+nth(x, 3)
+
+function prnlist(l)
+    print("(")
+    _prnlist(l) = l === nothing ? print("") : (print(l(true)); print(" "); _prnlist(l(false)))
+    _prnlist(l)
+    println(")")
+end
+
+prnlist(x)
