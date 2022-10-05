@@ -48,10 +48,11 @@ function add_edge_with_data!(g, s, d; data=Dict())
         lat_start = get_prop(g, s, :lat)
         lon_start = get_prop(g, s, :lon)
         lons, lats= point_on_radius(lon_start, lat_start, 0.0003)
-        add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[1], :lon=>lons[1], :end=>false))
+        # TODO: add archGDAL point to props
+        add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[1], :lon=>lons[1], :helper=>true, :end=>false))
         id_1 =nv(g)
         add_edge!(g, s, id_1, :helper, true)
-        add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[2], :lon=>lons[2], :end=>false))
+        add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[2], :lon=>lons[2], :helper=>true, :end=>false))
         id_2 = nv(g)
         add_edge!(g, id_2, d, :helper, true)
         add_edge_with_data!(g, id_1, id_2; data=data)
@@ -60,7 +61,7 @@ function add_edge_with_data!(g, s, d; data=Dict())
             #@warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
             # all of this is bad...
             lon_new, lat_new = offset_point_between(g, s, d)
-            add_vertex!(g, Dict(:osm_id=>0, :lat=>lat_new, :lon=>lon_new, :end=>false))
+            add_vertex!(g, Dict(:osm_id=>0, :lat=>lat_new, :lon=>lon_new, :helper=>true, :end=>false))
             add_edge!(g, s, nv(g), :helper, true)
             add_edge_with_data!(g, nv(g), d; data=data)
         else
@@ -143,7 +144,7 @@ end
 
 function geolinestring(nodes, node_id_list)
     nodelist = [nodes[id] for id in node_id_list]
-    location_tuples = [(node.location.lon, i.location.lat) for node in nodelist]
+    location_tuples = [(node.location.lon, node.location.lat) for node in nodelist]
     linestring = ArchGDAL.createlinestring(location_tuples)
     apply_wsg_84!(linestring)
     return linestring
