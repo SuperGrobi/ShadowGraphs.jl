@@ -6,11 +6,15 @@ using MetaGraphs
 using ProgressMeter
 using ArchGDAL
 
+const OSM_ref = Ref{ArchGDAL.ISpatialRef}()
+
+function __init__()
+    OSM_ref[] = ArchGDAL.importEPSG(4326; order=:trad)
+end
 # TODO: this is a duplicate from Composite Buildings. Something like this should idealy
 # be integrated into archGDAL itself...
-OSM_ref() = ArchGDAL.importEPSG(4326; order=:trad)
 function apply_wsg_84!(geom)
-    ArchGDAL.createcoordtrans(OSM_ref(), OSM_ref()) do trans
+    ArchGDAL.createcoordtrans(OSM_ref[], OSM_ref[]) do trans
         ArchGDAL.transform!(geom, trans)
     end
 end
