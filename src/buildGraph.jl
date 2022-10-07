@@ -191,15 +191,17 @@ function shadow_graph_from_light_osm_graph(g)
         ways = [g.ways[way_id] for way_id in g.node_to_way[start_osm_id]]
         for way in ways
             nodes_in_nav_graph = [node for node in way.nodes if node in osm_ids]
-
-            # cut of duplicate node, if the way starts and ends here.
-            if nodes_in_nav_graph[1] == nodes_in_nav_graph[end]
+            all_nodes_in_ng = copy(nodes_in_nav_graph)
+            # cut of duplicate node, if the way starts and ends here. (also be carefull of cirlces on a stick.)
+            if length(nodes_in_nav_graph) > 1 && nodes_in_nav_graph[1] == nodes_in_nav_graph[end]
                 nodes_in_nav_graph = nodes_in_nav_graph[1:end-1]
             end
 
             start_id_indices = findall(x->x==start_osm_id, nodes_in_nav_graph)
             if length(start_id_indices)!=1 && !is_lolipop_node(g, start_osm_id)
                 @warn "the start node $start_osm_id is $(length(start_id_indices)) times in the shortened way."
+                @warn all_nodes_in_ng
+                @warn "while adding way$(way.id)"
             end
 
             for start_id_index in start_id_indices

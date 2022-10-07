@@ -20,19 +20,6 @@ function Base.show(io::IO, ::MIME"juliavscode/html", map::FoliumDrawer)
     write(io, repr("text/html", map.x))
 end
 
-
-g_nav
-get_prop(g_nav, 40, :osm_id)
-g.node_to_way
-g.node_to_way[323232723]
-
-g.node_to_way[323233148]
-g.ways
-29387982
-29387958
-
-29387946
-29387958
 begin
     g, g_nav = shadow_graph_from_file("test_nottingham.json");
     x = [i[2] for i in g.node_coordinates]
@@ -40,6 +27,8 @@ begin
     x_nav = [get_prop(g_nav, i, :lon) for i in vertices(g_nav)]
     y_nav = [get_prop(g_nav, i, :lat) for i in vertices(g_nav)]
 end;
+
+x_nav
 
 begin
     m = flm.Map()
@@ -66,7 +55,7 @@ begin
         dla = get_prop(g_nav, dst(edge), :lat)+ 0.0001 *rand()
         dlo = get_prop(g_nav, dst(edge), :lon)+ 0.0001 *rand()
         color = "grey"
-        if has_prop(g_nav, edge, :geolinestring) && length(get_prop(g_nav, edge, :geolinestring)) == 0
+        if has_prop(g_nav, edge, :geolinestring) && ngeom(get_prop(g_nav, edge, :geolinestring)) == 0
             color = "orange"
         end
         flm.PolyLine([(sla, slo), (dla, dlo)], color=color, weight=5).add_to(m)
