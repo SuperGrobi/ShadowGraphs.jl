@@ -3,6 +3,7 @@ function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; kwargs...) wher
     println(kw)
     if series_type === :vertices
         kw[:radius] = get(kw, :radius, 2)
+        kw[:color] = get(kw, :color, "#e2b846")
         for vertex in vertices(g)
             lon = get_prop(g, vertex, :lon)
             lat = get_prop(g, vertex, :lat)
@@ -10,8 +11,8 @@ function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; kwargs...) wher
         end
     elseif series_type === :edges
         kw[:opacity] = get(kw, :opacity, 0.5)
-        kw[:weight] = get(kw, :weight, 5)
-        kw[:color] = get(kw, :color, "#bbbbbb")
+        kw[:weight] = get(kw, :weight, 2)
+        kw[:color] = get(kw, :color, "#e56c6c")
         for edge in edges(g)
             sla = get_prop(g, src(edge), :lat)
             slo = get_prop(g, src(edge), :lon)
