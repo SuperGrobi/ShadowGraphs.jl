@@ -212,7 +212,7 @@ function shadow_graph_from_light_osm_graph(g)
                     linestring = geolinestring(g.nodes, node_id_list)
                     data = Dict(
                         :(osm_id) => way.id,
-                        :geolinestring => linestring,
+                        :edgegeom => linestring,
                         :geomlength => 0
                     )
                     add_edge_with_data!(g_nav, start_node_id, next_nav_id; data=data)

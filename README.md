@@ -34,7 +34,7 @@ In general, for non-helper nodes and edges, the following props are available:
 
 - Edges
     - `:osm_id` (osm id of way which connects the start and end)
-    - `:geolinestring` (ArchGDAL Linestring with coordinates of the nodes in the Way connecting the start and end, in WSG84)
+    - `:edgegeom` (ArchGDAL Linestring with coordinates of the nodes in the Way connecting the start and end, in WSG84)
     - `:geomlength` (geometric length of street between start and end. (currently always 0, since I did not yet implement this...))
 
 Be aware, that helper edges and nodes do not have all of these properties. Before getting these props a check if they exist is in order. Else stuff breaks. Helper nodes and edges have the following `props`:

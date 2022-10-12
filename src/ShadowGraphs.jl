@@ -3,6 +3,7 @@ using LightOSM
 using LightXML
 using Graphs
 using MetaGraphs
+using Folium
 using ProgressMeter
 using ArchGDAL
 
@@ -23,4 +24,5 @@ end
 export shadow_graph_from_object, shadow_graph_from_file, shadow_graph_from_download
 include("buildGraph.jl")
 
+include("plotting.jl")
 end
