@@ -49,10 +49,10 @@ function add_edge_with_data!(g, s, d; data=Dict())
         lon_start = get_prop(g, s, :lon)
         lons, lats= point_on_radius(lon_start, lat_start, 0.0003)
         # TODO: add archGDAL point to props
-        add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[1], :lon=>lons[1], :helper=>true, :end=>false))
+        add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[1], :lon=>lons[1], :helper=>true))
         id_1 =nv(g)
         add_edge!(g, s, id_1, :helper, true)
-        add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[2], :lon=>lons[2], :helper=>true, :end=>false))
+        add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[2], :lon=>lons[2], :helper=>true))
         id_2 = nv(g)
         add_edge!(g, id_2, d, :helper, true)
         add_edge_with_data!(g, id_1, id_2; data=data)
@@ -61,7 +61,7 @@ function add_edge_with_data!(g, s, d; data=Dict())
             #@warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
             # all of this is bad...
             lon_new, lat_new = offset_point_between(g, s, d)
-            add_vertex!(g, Dict(:osm_id=>0, :lat=>lat_new, :lon=>lon_new, :helper=>true, :end=>false))
+            add_vertex!(g, Dict(:osm_id=>0, :lat=>lat_new, :lon=>lon_new, :helper=>true))
             add_edge!(g, s, nv(g), :helper, true)
             add_edge_with_data!(g, nv(g), d; data=data)
         else
@@ -150,6 +150,50 @@ function geolinestring(nodes, node_id_list)
     return linestring
 end
 
+function get_rotational_direction(light_osm_graph)
+    nodes = light_osm_graph.nodes
+    ways = light_osm_graph.ways
+
+    rot_dir = 0
+    for way in values(ways)
+        !is_circular_way(way) && continue  # skip non rings
+        node_ids = way.nodes
+        points = [nodes[node_id].location for node_id in node_ids[1:end-1]]
+        x = [i.lon for i in points]
+        y = [i.lat for i in points]
+        min_x_ind = findall(e->e==minimum(x), x)
+
+        min_y_options = y[min_x_ind]
+        y_ind = argmin(min_y_options)
+        ind = min_x_ind[y_ind]
+
+        x_b = x[ind]
+        y_b = y[ind]
+        ind_low = mod1(ind-1, length(points))
+        x_a = x[ind_low]
+        y_a = y[ind_low]
+        ind_high = mod1(ind+1, length(points))
+        x_c = x[ind_high]
+        y_c = y[ind_high]
+
+        det = (x_b-x_a)*(y_c - y_a) - (x_c - x_a)*(y_b-y_a)
+        if det > 0
+            rot_dir += 1
+        elseif det < 0
+            rot_dir -= 1
+        end
+    end
+    rot_dir == 0 && @warn "not rotational direction could be found. choosing right hand side driving."
+    if rot_dir >= 0
+        @info "right hand side driving selected"
+        return 1
+    else
+        @info "left hand side driving selected"
+        return -1
+    end
+end
+
+
 """
 This is the final function getting called on shadow graph creation.
 It takes a fully formed LightOSM.OSMGraph instance and transforms
@@ -175,7 +219,8 @@ function shadow_graph_from_light_osm_graph(g)
                 :lat => lat_point,
                 :lon => lon_point,
                 :end => is_end_node(g.graph, index),
-                :geopoint=>point
+                :geopoint=>point,
+                :helper=>false
             )
             add_node_with_data!(g_nav, current_new_index; data=data)
             current_new_index += 1
@@ -212,8 +257,10 @@ function shadow_graph_from_light_osm_graph(g)
                     linestring = geolinestring(g.nodes, node_id_list)
                     data = Dict(
                         :(osm_id) => way.id,
+                        :tags => way.tags,
                         :edgegeom => linestring,
-                        :geomlength => 0
+                        :geomlength => 0,
+                        :helper => false
                     )
                     add_edge_with_data!(g_nav, start_node_id, next_nav_id; data=data)
                 end
@@ -221,8 +268,10 @@ function shadow_graph_from_light_osm_graph(g)
         end
     end
 
-    # build ArchGDAL linestring from high density graph and attach it to every edge
     
+    set_prop!(g_nav, :crs, OSM_ref[])
+    offset_dir = get_rotational_direction(g)
+    set_prop!(g_nav, :offset_dir, offset_dir)
     return g, g_nav
 end
 

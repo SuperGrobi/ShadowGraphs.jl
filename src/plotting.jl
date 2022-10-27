@@ -1,6 +1,5 @@
 function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; kwargs...) where {T<:AbstractMetaGraph}
     kw = Dict{Symbol, Any}(kwargs)
-    println(kw)
     if series_type === :vertices
         kw[:radius] = get(kw, :radius, 2)
         kw[:color] = get(kw, :color, "#e2b846")
@@ -22,14 +21,14 @@ function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; kwargs...) wher
         end
     elseif series_type === :edgegeom
         for edge in edges(g)
-            !has_prop(g, edge, :edgegeom) && continue
+            get_prop(g, edge, :helper) && continue
             linestring = get_prop(g, edge, :edgegeom)
             draw!(fig, linestring; kw...)
         end
     elseif series_type === :shadowgeom
         kw[:color] = get(kw, :color, "black")
         for edge in edges(g)
-            !has_prop(g, edge, :shadowgeom) && continue
+            get_prop(g, edge, :helper) && continue
             line = get_prop(g, edge, :shadowgeom)
             draw!(fig, line; kw...)
         end
