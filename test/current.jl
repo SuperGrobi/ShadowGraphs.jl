@@ -137,7 +137,7 @@ has_prop
 g
 
 begin
-    points = [get_prop(g_nav, i, :geopoint) for i in vertices(g_nav) if has_prop(g_nav, i, :geopoint)]
+    points = [(get_prop(g_nav, i, :lon), get_prop(g_nav, i, :lat)) for i in vertices(g_nav) if !get_prop(g_nav, i, :helper)]
     layer = Leaflet.Layer.(points)
     provider = Leaflet.CARTO(:dark_nolabels)
 m = Leaflet.Map(; layers=layer, provider=provider, zoom=3, height=1000, center=[30.0, 120.0]);

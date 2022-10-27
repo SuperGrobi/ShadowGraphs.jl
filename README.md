@@ -23,6 +23,10 @@ Since the `MetaDiGraph` type does not support multi-edges, (and plotting of self
 - if we want to add an edge between distinct nodes where an edge already exists, we add a node to the graph and connect the start and destination nodes to this one.
 - if we want to add a self edge, we create two helper nodes and connect these to the start and destination in the appropriate order.
 
+The Graph has two props itself:
+- `:csr` This contains some kind of crs information. Not sure if I am actually going to use it...
+- `:offset_dir` either 1 or -1. Whether we need to move the line to the left (-1, greater british empire) or to the right (1, everywhere else in the world)
+
 In general, for non-helper nodes and edges, the following props are available:
 
 - Nodes
@@ -30,28 +34,26 @@ In general, for non-helper nodes and edges, the following props are available:
     - `:lat`
     - `:lon`
     - `:end` (if this vertex is the end of a way (might remove this in the future))
-    - `:geopoint` (ArchGDAL Point with lat and lon in WSG84)
+    - `:helper` if this node is a helper node.
 
 - Edges
     - `:osm_id` (osm id of way which connects the start and end)
     - `:edgegeom` (ArchGDAL Linestring with coordinates of the nodes in the Way connecting the start and end, in WSG84)
-    - `:geomlength` (geometric length of street between start and end. (currently always 0, since I did not yet implement this...))
+    - `:geomlength` (geometric length of street between start and end. (currently always 0 directly after initialisation. Is set elsewhere.)
+    - `:helper` if this edge is a helper edge
+    - `:tags` dictionary of tags extracted from the original way. (no guarantees on what is in there.)
 
-Be aware, that helper edges and nodes do not have all of these properties. Before getting these props a check if they exist is in order. Else stuff breaks. Helper nodes and edges have the following `props`:
+
+Helper nodes and edges have the following `props`:
 - Nodes
-    - `:osm_id` (always 0)
     - `:lat`
     - `:lon`
-    - `:end` (always false) (will probably get removed at some point)
-    - `:helper` (always true)
-
-(I will add the `:geopoint` at some point.)
+    - `:helper` if this node is a helper node
 
 - Edges
-    - `:helper` (always true)
+    - `:helper` if this is a helper edge
 
-I should probably overhaul all of this at some point in the future.
 
 That should be it. The code is very messy and badly commented. If you have any questions just shout although I probably will not be able to remember why I did stuff the way I did it. (It works... I think.)
 
-Note to self: I should add tests. (If you want to write tests... you are the most welcome to do so.)
+Note to self: I should add tests. (Note to everybody else: If you want to write tests... you are more than welcome to do so.)

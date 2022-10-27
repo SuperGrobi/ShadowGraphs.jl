@@ -49,10 +49,10 @@ function add_edge_with_data!(g, s, d; data=Dict())
         lon_start = get_prop(g, s, :lon)
         lons, lats= point_on_radius(lon_start, lat_start, 0.0003)
         # TODO: add archGDAL point to props
-        add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[1], :lon=>lons[1], :helper=>true))
+        add_vertex!(g, Dict(:lat=>lats[1], :lon=>lons[1], :helper=>true))
         id_1 =nv(g)
         add_edge!(g, s, id_1, :helper, true)
-        add_vertex!(g, Dict(:osm_id=>0, :lat=>lats[2], :lon=>lons[2], :helper=>true))
+        add_vertex!(g, Dict(:lat=>lats[2], :lon=>lons[2], :helper=>true))
         id_2 = nv(g)
         add_edge!(g, id_2, d, :helper, true)
         add_edge_with_data!(g, id_1, id_2; data=data)
@@ -61,7 +61,7 @@ function add_edge_with_data!(g, s, d; data=Dict())
             #@warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
             # all of this is bad...
             lon_new, lat_new = offset_point_between(g, s, d)
-            add_vertex!(g, Dict(:osm_id=>0, :lat=>lat_new, :lon=>lon_new, :helper=>true))
+            add_vertex!(g, Dict(:lat=>lat_new, :lon=>lon_new, :helper=>true))
             add_edge!(g, s, nv(g), :helper, true)
             add_edge_with_data!(g, nv(g), d; data=data)
         else
@@ -212,14 +212,11 @@ function shadow_graph_from_light_osm_graph(g)
         if length(ways) > 1 || is_end_node(g.graph, index) || is_lolipop_node(g, osm_id)
             lat_point = g.nodes[osm_id].location.lat
             lon_point = g.nodes[osm_id].location.lon
-            point = ArchGDAL.createpoint(lon_point, lat_point)
-            apply_wsg_84!(point)
             data = Dict(
                 :(osm_id) => osm_id,
                 :lat => lat_point,
                 :lon => lon_point,
                 :end => is_end_node(g.graph, index),
-                :geopoint=>point,
                 :helper=>false
             )
             add_node_with_data!(g_nav, current_new_index; data=data)
