@@ -199,7 +199,7 @@ This is the final function getting called on shadow graph creation.
 It takes a fully formed LightOSM.OSMGraph instance and transforms
 it to the graph we want to have. (whatever that may be...)
 """
-function shadow_graph_from_light_osm_graph(g) 
+function shadow_graph_from_light_osm_graph(g, raw_ways) 
     # make the streets nodes are a part contain only unique elements
     g.node_to_way = Dict(key => collect(Set(value)) for (key, value) in g.node_to_way)
     # build clean graph containing only nodes for topologically relevant nodes
@@ -272,6 +272,9 @@ function shadow_graph_from_light_osm_graph(g)
     return g, g_nav
 end
 
+get_raw_ways(osm_json_object::AbstractDict) = LightOSM.osm_dict_from_json(osm_json_object)["way"]
+get_raw_ways(osm_xml_object::XMLDocument) = LightOSM.osm_dict_from_xml(osm_xml_object)["way"]
+
 function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict};
     network_type::Symbol=:drive,
     weight_type::Symbol=:time,  # this may become obsolete
@@ -286,7 +289,8 @@ function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict};
         precompute_dijkstra_states=precompute_dijkstra_states,
         largest_connected_component=largest_connected_component
         )
-    return shadow_graph_from_light_osm_graph(g)
+    raw_ways = get_raw_ways(osm_data_object)
+    return shadow_graph_from_light_osm_graph(g, raw_ways)
 end
 
 function shadow_graph_from_file(file_path::String;
@@ -296,14 +300,18 @@ function shadow_graph_from_file(file_path::String;
     precompute_dijkstra_states::Bool=false,  # this also... 
     largest_connected_component::Bool=true  # this also...
     )
-    g = graph_from_file(file_path;
+
+    !isfile(file_path) && throw(ArgumentError("File $file_path does not exist"))
+    deserializer = LightOSM.file_deserializer(file_path)
+    obj = deserializer(file_path)
+
+    return shadow_graph_from_object(obj;
     network_type=network_type,
     weight_type=weight_type,  # this might become obsolete
     graph_type=graph_type,  # this also...
     precompute_dijkstra_states=precompute_dijkstra_states,  # this also... 
     largest_connected_component=largest_connected_component  # this also...
     )
-    return shadow_graph_from_light_osm_graph(g)
 end
 
 function shadow_graph_from_download(download_method::Symbol;
@@ -316,16 +324,17 @@ function shadow_graph_from_download(download_method::Symbol;
         precompute_dijkstra_states::Bool=false,  # this also...
         largest_connected_component::Bool=true,  # this also...
         download_kwargs...)
-    g = graph_from_download(download_method;
+    obj = download_osm_network(download_method,
         network_type=network_type,
         metadata=metadata,
         download_format=download_format,
-        save_to_file_location=save_to_file_location,
+        save_to_file_location=save_to_file_location;
+        download_kwargs...)
+    return shadow_graph_from_object(obj;
+        network_type=network_type,
         weight_type=weight_type,  # this might become obsolete
         graph_type=graph_type,  # this also...
         precompute_dijkstra_states=precompute_dijkstra_states,  # this also...
-        largest_connected_component=largest_connected_component,  # this also...
-        download_kwargs...)
-    return shadow_graph_from_light_osm_graph(g)
-end
+        largest_connected_component=largest_connected_component)  # this also...
+    end
     

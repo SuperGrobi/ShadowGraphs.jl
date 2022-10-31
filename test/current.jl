@@ -21,6 +21,7 @@ function Base.show(io::IO, ::MIME"juliavscode/html", map::FoliumDrawer)
     write(io, repr("text/html", map.x))
 end
 
+    g, g_nav = shadow_graph_from_file("../../data/nottingham/clifton/test_clifton_bike.json"; network_type=:bike)
 begin
     g, g_nav = shadow_graph_from_file("../../data/nottingham/test_nottingham.json");
     x = [i[2] for i in g.node_coordinates]
