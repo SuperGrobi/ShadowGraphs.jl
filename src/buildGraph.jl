@@ -193,13 +193,87 @@ function get_rotational_direction(light_osm_graph)
     end
 end
 
+function width(tags)
+    width = get(tags, "width", missing)
+    if width !== missing
+        return width isa String ? max([LightOSM.remove_non_numeric(h) for h in split(width, r"[+^;,-]")]...) : width
+    else
+        return missing
+    end
+end
+
+function numeric_tag(tags::AbstractDict, tagname)
+    numeric_tag_value = get(tags, tagname, missing)
+    U = LightOSM.DEFAULT_OSM_LANES_TYPE
+
+    if numeric_tag_value !== missing
+        if numeric_tag_value isa Integer
+            return numeric_tag_value
+        elseif numeric_tag_value isa AbstractFloat
+            return U(round(numeric_tag_value))
+        elseif numeric_tag_value isa String 
+            numeric_tag_value = split(numeric_tag_value, LightOSM.COMMON_OSM_STRING_DELIMITERS)
+            numeric_tag_value = [LightOSM.remove_non_numeric(l) for l in numeric_tag_value]
+            return U(round(mean(numeric_tag_value)))
+        else
+            throw(ErrorException("$tagname is neither a string nor number, check data quality: $numeric_tag_value"))
+        end
+    else
+        return missing
+    end
+end
+
+
+function parse_raw_ways(raw_ways, network_type)
+    T = LightOSM.DEFAULT_OSM_ID_TYPE
+    ways = Dict{T,Way{T}}()
+    highway_nodes = Set{Int}([])
+    for way in raw_ways
+        if haskey(way, "tags") && haskey(way, "nodes")
+            tags = way["tags"]
+            if LightOSM.is_highway(tags) && LightOSM.matches_network_type(tags, network_type)
+                tags["oneway"] = LightOSM.is_oneway(tags)
+                tags["reverseway"] = LightOSM.is_reverseway(tags)
+
+                tags["width"] = width(tags)
+
+                tags["lanes"] = numeric_tag(tags, "lanes")
+
+                tags["lanes:forward"] = numeric_tag(tags, "lanes:forward")
+                tags["lanes:backward"] = numeric_tag(tags, "lanes:backward")
+
+                nds = way["nodes"]
+                tags["maxspeed"] = LightOSM.maxspeed(tags)
+                union!(highway_nodes, nds)
+                id = way["id"]
+                ways[id] = Way(id, nds, tags)
+            elseif LightOSM.is_railway(tags) && LightOSM.matches_network_type(tags, network_type)
+                tags["rail_type"] = get(tags, "railway", "unknown")
+                tags["electrified"] = get(tags, "electrified", "unknown")
+                tags["gauge"] = get(tags, "gauge", nothing)
+                tags["usage"] = get(tags, "usage",  "unknown")
+                tags["name"] = get(tags, "name", "unknown")
+                tags["lanes"] = get(tags, "tracks", 1)
+                tags["maxspeed"] = LightOSM.maxspeed(tags)
+                tags["oneway"] = LightOSM.is_oneway(tags)
+                tags["reverseway"] = LightOSM.is_reverseway(tags)
+                nds = way["nodes"]
+                union!(highway_nodes, nds)
+                id = way["id"]
+                ways[id] = Way(id, nds, tags)
+            end
+        end
+    end
+    return ways
+end
+
 
 """
 This is the final function getting called on shadow graph creation.
 It takes a fully formed LightOSM.OSMGraph instance and transforms
 it to the graph we want to have. (whatever that may be...)
 """
-function shadow_graph_from_light_osm_graph(g, raw_ways) 
+function shadow_graph_from_light_osm_graph(g)
     # make the streets nodes are a part contain only unique elements
     g.node_to_way = Dict(key => collect(Set(value)) for (key, value) in g.node_to_way)
     # build clean graph containing only nodes for topologically relevant nodes
@@ -282,6 +356,9 @@ function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict};
     precompute_dijkstra_states::Bool=false, # this also...
     largest_connected_component::Bool=true  # this also...
     )
+    raw_ways = deepcopy(get_raw_ways(osm_data_object))
+    parsed_ways = parse_raw_ways(raw_ways, network_type)
+
     g = graph_from_object(osm_data_object;
         network_type=network_type,
         weight_type=weight_type,
@@ -289,8 +366,11 @@ function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict};
         precompute_dijkstra_states=precompute_dijkstra_states,
         largest_connected_component=largest_connected_component
         )
-    raw_ways = get_raw_ways(osm_data_object)
-    return shadow_graph_from_light_osm_graph(g, raw_ways)
+    for i in keys(g.ways)
+        g.ways[i] = parsed_ways[i]
+    end
+
+    return shadow_graph_from_light_osm_graph(g)
 end
 
 function shadow_graph_from_file(file_path::String;

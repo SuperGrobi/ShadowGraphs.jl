@@ -21,7 +21,23 @@ function Base.show(io::IO, ::MIME"juliavscode/html", map::FoliumDrawer)
     write(io, repr("text/html", map.x))
 end
 
-    g, g_nav = shadow_graph_from_file("../../data/nottingham/clifton/test_clifton_bike.json"; network_type=:bike)
+g_light, g_shadow = shadow_graph_from_file("../../data/nottingham/clifton/test_clifton_bike.json"; network_type=:bike);
+
+g_light.ways
+
+fwds = [get(i.second.tags, "lanes:backward", "hallo") for i in g_light.ways]
+
+
+k = Set(vcat(collect.(keys.([get_prop(g_shadow, edge, :tags) for edge in edges(g_shadow) if has_prop(g_shadow, edge, :tags)]))...))
+
+
+
+parsed
+orig
+
+mis = [i for i in keys(parsed) if !(i in keys(orig))]
+mis = [i for i in keys(orig) if !(i in keys(parsed))]
+
 begin
     g, g_nav = shadow_graph_from_file("../../data/nottingham/test_nottingham.json");
     x = [i[2] for i in g.node_coordinates]

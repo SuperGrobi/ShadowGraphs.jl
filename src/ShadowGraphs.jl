@@ -6,6 +6,7 @@ using MetaGraphs
 using Folium
 using ProgressMeter
 using ArchGDAL
+using Statistics
 
 const OSM_ref = Ref{ArchGDAL.ISpatialRef}()
 
