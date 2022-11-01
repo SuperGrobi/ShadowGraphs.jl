@@ -30,7 +30,7 @@ fwds = [get(i.second.tags, "lanes:backward", "hallo") for i in g_light.ways]
 
 k = Set(vcat(collect.(keys.([get_prop(g_shadow, edge, :tags) for edge in edges(g_shadow) if has_prop(g_shadow, edge, :tags)]))...))
 
-
+[get_prop(g_shadow, edge, :tags) for edge in edges(g_shadow) if has_prop(g_shadow, edge, :tags)]
 
 parsed
 orig
