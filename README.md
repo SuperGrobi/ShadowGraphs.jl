@@ -33,7 +33,7 @@ In general, for non-helper nodes and edges, the following props are available:
     - `:osm_id` (osm id of vertex)
     - `:lat`
     - `:lon`
-    - `:end` (if this vertex is the end of a way (might remove this in the future))
+    - `:pointgeom` (GDAL point representing the location of nodes)
     - `:helper` if this node is a helper node.
 
 - Edges
@@ -49,12 +49,14 @@ In general, for non-helper nodes and edges, the following props are available:
         - `lanes:forward` (number of lanes in mapped direction of way (this convention leaves this tag independent of the `reverseway` tag.) `missing` if none is mapped)
         - `lanes:backward` (number of lanes against mapped direction of way. `missing` if none is mapped)
         - `maxspeed` (maximal allowed speed on this road. uses some default values defined in `LightOSM.jl` (we don't realy care about this property.))
+    - `parsing_direction` either -1 or 1, denotes the direction in which we had to step through the original way to get from the source to the destination. (using this, we can see wether we need to use the `lanes:forward` or the `lanes:backward` tag... 1 means forward, -1 means backward)
 
 
 Helper nodes and edges have the following `props`:
 - Nodes
     - `:lat`
     - `:lon`
+    - `:pointgeom` (GDAL point representing the location of nodes)
     - `:helper` if this node is a helper node
 
 - Edges
