@@ -1,8 +1,6 @@
 trans(col, val::T) where {T<:ArchGDAL.IGeometry} = ArchGDAL.toWKT(val)
 trans(col, val::T) where {T<:ArchGDAL.ISpatialRef} = ArchGDAL.toWKT(val)
-function trans(col, val)
-    return val
-end
+trans(col, val) = val
 
 function export_graph_to_csv(path, graph; remove_internal_data = false)
     if contains(path, '/')
