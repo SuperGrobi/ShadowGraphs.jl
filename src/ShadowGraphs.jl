@@ -7,6 +7,8 @@ using Folium
 using ProgressMeter
 using ArchGDAL
 using Statistics
+using DataFrames
+using CSV
 
 const OSM_ref = Ref{ArchGDAL.ISpatialRef}()
 
@@ -26,4 +28,7 @@ export shadow_graph_from_object, shadow_graph_from_file, shadow_graph_from_downl
 include("buildGraph.jl")
 
 include("plotting.jl")
+
+export save_graph_to_csv
+include("persistence.jl")
 end

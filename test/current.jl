@@ -23,6 +23,11 @@ end
 
 g_light, g_shadow = shadow_graph_from_file("../../data/nottingham/clifton/test_clifton_bike.json"; network_type=:bike);
 
+save_graph_to_csv("dir/test.csv", g_shadow)
+save_graph_to_csv("test.csv", g_shadow)
+save_graph_to_csv("dir/test", g_shadow)
+save_graph_to_csv("test", g_shadow; remove_internal_data=true)
+
 g_light.ways
 
 fwds = [get(i.second.tags, "lanes:backward", "hallo") for i in g_light.ways]
@@ -31,6 +36,12 @@ fwds = [get(i.second.tags, "lanes:backward", "hallo") for i in g_light.ways]
 k = Set(vcat(collect.(keys.([get_prop(g_shadow, edge, :tags) for edge in edges(g_shadow) if has_prop(g_shadow, edge, :tags)]))...))
 
 [get_prop(g_shadow, edge, :tags) for edge in edges(g_shadow) if has_prop(g_shadow, edge, :tags)]
+
+plot([get_prop(g_shadow, node, :pointgeom) for node in vertices(g_shadow)], ratio=1)
+
+g_shadow
+
+
 
 parsed
 orig
