@@ -29,6 +29,6 @@ include("buildGraph.jl")
 
 include("plotting.jl")
 
-export save_graph_to_csv
+export export_graph_to_csv
 include("persistence.jl")
 end
