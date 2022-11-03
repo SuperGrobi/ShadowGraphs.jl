@@ -26,7 +26,7 @@ function save_graph_to_csv(path, graph; remove_internal_data = false)
         push!(node_df, props(graph, vertex); cols=:union)
     end
     if remove_internal_data
-        cols_to_remove = ["pointgeom", "nonexitsten_col"]
+        cols_to_remove = ["pointgeom"]
         cols_exist = names(node_df)
         select!(node_df, Not([i for i in cols_to_remove if i in cols_exist]))
     end
@@ -42,7 +42,7 @@ function save_graph_to_csv(path, graph; remove_internal_data = false)
         push!(edge_df, eprop; cols=:union)
     end
     if remove_internal_data
-        cols_to_remove = ["tags", "parsing_direction"]
+        cols_to_remove = ["tags", "shadowpartgeom", "shadowed_part_length", "parsing_direction", "geomlength"]
         cols_exist = names(edge_df)
         select!(edge_df, Not([i for i in cols_to_remove if i in cols_exist]))
     end
