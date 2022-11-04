@@ -104,6 +104,20 @@ function get_neighbor_indices(way::Way, start_id_index, nodes_in_nav_graph)
 end
 
 function is_lolipop_node(g, osm_id)
+    ocurrences = []
+    is_not_circular = []
+    for way_id in g.node_to_way[osm_id]
+        way = g.ways[way_id]
+        nodes = way.nodes
+        ocur_in_way = count(x->x==osm_id, nodes)
+        push!(ocurrences, ocur_in_way)
+        push!(is_not_circular, !is_circular_way(way))
+        ocur_in_way > 2 && @warn "the node $osm_id is contained $ocur_in_way in a way. better check that out..."
+    end
+    return any(ocurrences .== 2 .&& is_not_circular)
+end
+
+function is_lolipop_node_old(g, osm_id)
     way_id = first(g.node_to_way[osm_id])
     way = g.ways[way_id]
     nodes = way.nodes
@@ -326,7 +340,7 @@ function shadow_graph_from_light_osm_graph(g)
             if length(start_id_indices)!=1 && !is_lolipop_node(g, start_osm_id)
                 @warn "the start node $start_osm_id is $(length(start_id_indices)) times in the shortened way."
                 @warn all_nodes_in_ng
-                @warn "while adding way$(way.id)"
+                @warn "while adding way $(way.id)"
             end
 
             for start_id_index in start_id_indices
