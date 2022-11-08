@@ -4,7 +4,7 @@ function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; kwargs...) wher
         kw[:radius] = get(kw, :radius, 2)
         kw[:color] = get(kw, :color, "#e2b846")
         for vertex in vertices(g)
-            tt = "osm id: $(has_prop(g, vertex, :osm_id) ? get_prop(g, vertex, :osm_id) : 0),\ngraph vertex: $vertex"
+            tt = "osm id: $(has_prop(g, vertex, :osm_id) ? get_prop(g, vertex, :osm_id) : 0)<br>graph vertex: $vertex"
             lon = get_prop(g, vertex, :lon)
             lat = get_prop(g, vertex, :lat)
             draw!(fig, lon, lat, :circle; tooltip=tt, popup=tt, kw...)
