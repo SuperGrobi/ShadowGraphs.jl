@@ -5,9 +5,13 @@ using GraphPlot
 using Compose
 using MetaGraphs
 using Plots
+using GeoInterface
 using GraphRecipes
+using ArchGDAL
 using PyCall
 using Colors
+using WebIO
+using Folium
 flm = pyimport("folium")
 
 struct FoliumDrawer
@@ -17,26 +21,43 @@ function Base.show(io::IO, ::MIME"juliavscode/html", map::FoliumDrawer)
     write(io, repr("text/html", map.x))
 end
 
+g_light, g_shadow = shadow_graph_from_file("../../data/nottingham/clifton/test_clifton_bike.json"; network_type=:bike);
 
-g_nav
-get_prop(g_nav, 40, :osm_id)
-g.node_to_way
-g.node_to_way[323232723]
+save_graph_to_csv("dir/test.csv", g_shadow)
+save_graph_to_csv("test.csv", g_shadow)
+save_graph_to_csv("dir/test", g_shadow)
+save_graph_to_csv("test", g_shadow; remove_internal_data=true)
 
-g.node_to_way[323233148]
-g.ways
-29387982
-29387958
+g_light.ways
 
-29387946
-29387958
+fwds = [get(i.second.tags, "lanes:backward", "hallo") for i in g_light.ways]
+
+
+k = Set(vcat(collect.(keys.([get_prop(g_shadow, edge, :tags) for edge in edges(g_shadow) if has_prop(g_shadow, edge, :tags)]))...))
+
+[get_prop(g_shadow, edge, :tags) for edge in edges(g_shadow) if has_prop(g_shadow, edge, :tags)]
+
+plot([get_prop(g_shadow, node, :pointgeom) for node in vertices(g_shadow)], ratio=1)
+
+g_shadow
+
+
+
+parsed
+orig
+
+mis = [i for i in keys(parsed) if !(i in keys(orig))]
+mis = [i for i in keys(orig) if !(i in keys(parsed))]
+
 begin
-    g, g_nav = shadow_graph_from_file("test_nottingham.json");
+    g, g_nav = shadow_graph_from_file("../../data/nottingham/test_nottingham.json");
     x = [i[2] for i in g.node_coordinates]
     y = [i[1] for i in g.node_coordinates]
     x_nav = [get_prop(g_nav, i, :lon) for i in vertices(g_nav)]
     y_nav = [get_prop(g_nav, i, :lat) for i in vertices(g_nav)]
-end
+end;
+
+draw(g_nav, :edgegeom)
 
 begin
     m = flm.Map()
@@ -58,11 +79,15 @@ begin
     end
 
     for edge in edges(g_nav)
-        sla = get_prop(g_nav, src(edge), :lat)
-        slo = get_prop(g_nav, src(edge), :lon)
-        dla = get_prop(g_nav, dst(edge), :lat)
-        dlo = get_prop(g_nav, dst(edge), :lon)
-        flm.PolyLine([(sla, slo), (dla, dlo)], color="gray", weight=5).add_to(m)
+        sla = get_prop(g_nav, src(edge), :lat) + 0.0001 *rand()
+        slo = get_prop(g_nav, src(edge), :lon)+ 0.0001 *rand()
+        dla = get_prop(g_nav, dst(edge), :lat)+ 0.0001 *rand()
+        dlo = get_prop(g_nav, dst(edge), :lon)+ 0.0001 *rand()
+        color = "grey"
+        if has_prop(g_nav, edge, :edgegeom) && ngeom(get_prop(g_nav, edge, :edgegeom)) == 0
+            color = "orange"
+        end
+        flm.PolyLine([(sla, slo), (dla, dlo)], color=color, weight=5).add_to(m)
     end
 
     bounds = [(minimum(y), minimum(x)), (maximum(y), maximum(x))]
@@ -135,5 +160,61 @@ g = SimpleDiGraph(4)
 for i in vertices(g)
     add_vertex!(g)
 end
-
+hasproperty
+has_prop
 g
+
+begin
+    points = [(get_prop(g_nav, i, :lon), get_prop(g_nav, i, :lat)) for i in vertices(g_nav) if !get_prop(g_nav, i, :helper)]
+    layer = Leaflet.Layer.(points)
+    provider = Leaflet.CARTO(:dark_nolabels)
+m = Leaflet.Map(; layers=layer, provider=provider, zoom=3, height=1000, center=[30.0, 120.0]);
+w = Blink.Window()
+body!(w, m)
+end
+
+fieldnames(Way)
+
+using Leaflet
+using Blink
+provider = Leaflet.CARTO(:dark_nolabels)
+m = Leaflet.Map(; layers=Leaflet.Layer[], provider=provider, zoom=3, height=1000, center=[30.0, 120.0])
+
+w = Blink.Window()
+body!(w, m)
+
+m
+WebIO.render(m)
+m.scope.dom
+
+fieldnames(Leaflet.Map)
+
+a = WebIO.render(m)
+typeof(a)
+
+fieldnames(WebIO.Node)
+
+
+cons(h, t) = w -> w ? h : t
+x = cons(1, cons(2, cons(3, nothing)))
+
+x(false)(false)(true)
+
+function nth(l, n)
+    if n==1
+        return l(true)
+    else
+        return nth(l(false), n-1)
+    end
+end
+
+nth(x, 3)
+
+function prnlist(l)
+    print("(")
+    _prnlist(l) = l === nothing ? print("") : (print(l(true)); print(" "); _prnlist(l(false)))
+    _prnlist(l)
+    println(")")
+end
+
+prnlist(x)
