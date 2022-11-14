@@ -117,15 +117,6 @@ function is_lolipop_node(g, osm_id)
     return any(ocurrences .== 2 .&& is_not_circular)
 end
 
-function is_lolipop_node_old(g, osm_id)
-    way_id = first(g.node_to_way[osm_id])
-    way = g.ways[way_id]
-    nodes = way.nodes
-    ocurrences = count(x->x==osm_id, nodes)
-    ocurrences > 2 && @warn "the node $osm_id is contained $ocurrences in a way. better check that out..."
-    return ocurrences == 2 && !is_circular_way(way)
-end
-
 function get_node_list(way, start_pos, dest_osm_id, direction)
     nodes = way.nodes
     string_nodes = [nodes[start_pos]]
