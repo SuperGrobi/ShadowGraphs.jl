@@ -23,10 +23,10 @@ function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; kwargs...) wher
     elseif series_type === :edgegeom
         for edge in edges(g)
             !has_prop(g, edge, :edgegeom) && continue
-            id = has_prop(g, edge, :osm_id)
+            id = has_prop(g, edge, :osm_id) ? get_prop(g, edge, :osm_id) : 0
             shadowed_length = has_prop(g, edge, :shadowed_length) ? get_prop(g, edge, :shadowed_length) : 0
-            total_length = has_prop(g, edge, :total_length) ? get_prop(g, edge, :total_length) : -1
-            tt = "osm id: $id<br>shadow length: $shadowed_length<br>total length: $total_length<br>fraction in shadow: $(shadowed_length/total_length)"
+            full_length = has_prop(g, edge, :full_length) ? get_prop(g, edge, :full_length) : -1
+            tt = "osm id: $id<br>shadow length: $(round(shadowed_length; digits=2))<br>total length: $(round(full_length; digits=2))<br>fraction in shadow: $(round(shadowed_length/full_length; digits=2))"
             linestring = get_prop(g, edge, :edgegeom)
             draw!(fig, linestring; tooltip=tt, popup=tt, kw...)
         end
