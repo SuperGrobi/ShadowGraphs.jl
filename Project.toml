@@ -16,6 +16,14 @@ ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
+ArchGDAL = "0.9"
+MetaGraphs = "0.7"
+ProgressMeter = "1"
+LightXML = "0.9"
+Graphs = "1"
+LightOSM = "0.2"
+DataFrames = "1.4"
+CSV = "0.10"
 julia = "1.8"
 
 [extras]
