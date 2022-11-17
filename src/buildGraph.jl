@@ -364,22 +364,16 @@ end
 get_raw_ways(osm_json_object::AbstractDict) = LightOSM.osm_dict_from_json(osm_json_object)["way"]
 get_raw_ways(osm_xml_object::XMLDocument) = LightOSM.osm_dict_from_xml(osm_xml_object)["way"]
 
-function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict};
-    network_type::Symbol=:drive,
-    weight_type::Symbol=:time,  # this may become obsolete
-    graph_type::Symbol=:static,  # this also...
-    precompute_dijkstra_states::Bool=false, # this also...
-    largest_connected_component::Bool=true  # this also...
-    )
+function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict}; network_type::Symbol=:drive)
     raw_ways = deepcopy(get_raw_ways(osm_data_object))
     parsed_ways = parse_raw_ways(raw_ways, network_type)
 
     g = graph_from_object(osm_data_object;
         network_type=network_type,
-        weight_type=weight_type,
-        graph_type=graph_type,
-        precompute_dijkstra_states=precompute_dijkstra_states,
-        largest_connected_component=largest_connected_component
+        weight_type=:time,
+        graph_type=:static,
+        precompute_dijkstra_states=false,
+        largest_connected_component=true
         )
     for i in keys(g.ways)
         g.ways[i] = parsed_ways[i]
@@ -388,25 +382,12 @@ function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict};
     return shadow_graph_from_light_osm_graph(g)
 end
 
-function shadow_graph_from_file(file_path::String;
-    network_type::Symbol=:drive,
-    weight_type::Symbol=:time,  # this might become obsolete
-    graph_type::Symbol=:static,  # this also...
-    precompute_dijkstra_states::Bool=false,  # this also... 
-    largest_connected_component::Bool=true  # this also...
-    )
-
+function shadow_graph_from_file(file_path::String; network_type::Symbol=:drive)
     !isfile(file_path) && throw(ArgumentError("File $file_path does not exist"))
     deserializer = LightOSM.file_deserializer(file_path)
     obj = deserializer(file_path)
 
-    return shadow_graph_from_object(obj;
-    network_type=network_type,
-    weight_type=weight_type,  # this might become obsolete
-    graph_type=graph_type,  # this also...
-    precompute_dijkstra_states=precompute_dijkstra_states,  # this also... 
-    largest_connected_component=largest_connected_component  # this also...
-    )
+    return shadow_graph_from_object(obj; network_type=network_type)
 end
 
 function shadow_graph_from_download(download_method::Symbol;
@@ -414,10 +395,6 @@ function shadow_graph_from_download(download_method::Symbol;
         metadata::Bool=false,
         download_format::Symbol=:json,
         save_to_file_location::Union{String,Nothing}=nothing,
-        weight_type::Symbol=:time,  # this might become obsolete
-        graph_type::Symbol=:static,  # this also...
-        precompute_dijkstra_states::Bool=false,  # this also...
-        largest_connected_component::Bool=true,  # this also...
         download_kwargs...)
     obj = download_osm_network(download_method,
         network_type=network_type,
@@ -425,11 +402,6 @@ function shadow_graph_from_download(download_method::Symbol;
         download_format=download_format,
         save_to_file_location=save_to_file_location;
         download_kwargs...)
-    return shadow_graph_from_object(obj;
-        network_type=network_type,
-        weight_type=weight_type,  # this might become obsolete
-        graph_type=graph_type,  # this also...
-        precompute_dijkstra_states=precompute_dijkstra_states,  # this also...
-        largest_connected_component=largest_connected_component)  # this also...
+    return shadow_graph_from_object(obj; network_type=network_type)
     end
     
