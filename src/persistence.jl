@@ -2,6 +2,23 @@ trans(col, val::T) where {T<:ArchGDAL.IGeometry} = ArchGDAL.toWKT(val)
 trans(col, val::T) where {T<:ArchGDAL.ISpatialRef} = ArchGDAL.toWKT(val)
 trans(col, val) = val
 
+"""
+    export_graph_to_csv(path, graph; remove_internal_data = false)
+
+saves the shadow graph to a selection of csv files:
+- `"path"_nodes.csv`
+- `"path"_edges.csv`
+- `"path"_graph.csv` (contains graph properties)
+
+# arguments
+- path: path to the target directory. The different specifiers are appended to the filename given in this path.
+- graph: shadow graph to save
+- remove_internal_data: whether to remove internal data used for future calculations.
+(set this to true, if you do not need to be able to reimport the graph into `ShadowGraphs.jl` and want just the relevant "exposed" data)
+
+# returns
+saves multiple files to disk.
+"""
 function export_graph_to_csv(path, graph; remove_internal_data = false)
     if contains(path, '/')
         lastslash = findlast(==('/'), path)
@@ -31,6 +48,7 @@ function export_graph_to_csv(path, graph; remove_internal_data = false)
     node_file = dir * filename * "_nodes.csv"
     CSV.write(node_file, node_df; transform=trans)
     
+
     edge_df = DataFrame()
     for edge in edges(graph)
         eprop = props(graph, edge)
@@ -47,11 +65,10 @@ function export_graph_to_csv(path, graph; remove_internal_data = false)
     edge_file = dir * filename * "_edges.csv"
     CSV.write(edge_file, edge_df; transform=trans)
 
+
     graph_df = DataFrame()
     push!(graph_df, props(graph); cols=:union)
-    println(graph_df)
-    println(typeof(get_prop(graph, :crs)))
+
     graph_file = dir * filename * "_graph.csv"
     CSV.write(graph_file, graph_df; transform=trans)
-
 end
