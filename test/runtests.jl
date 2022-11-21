@@ -3,6 +3,7 @@ using LightOSM
 using Test
 
 @testset "Circularity weirdness" begin
+    @test true
     tags = Dict{String, Any}("oneway"=>false)
     roundabout_start_end = Way(1, [1,2,3,4,5,6,7,8,1], tags)
     roundabout_non_start = Way(1, [8,1,2,3,4,5,6,7,8], tags)
@@ -32,6 +33,4 @@ using Test
     lolipop = Way(1, [9,2,3,4,5,6,3], tags)
     neighs = ShadowGraphs.get_neighbor_indices(lolipop, 1, [9])
     println(neighs)
-
-
 end
