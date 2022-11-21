@@ -1,5 +1,6 @@
 using ShadowGraphs
 using LightOSM
+using Folium
 using Test
 
 @testset "Circularity weirdness" begin

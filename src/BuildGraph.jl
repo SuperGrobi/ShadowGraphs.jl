@@ -499,7 +499,7 @@ function shadow_graph_from_light_osm_graph(g)
     set_prop!(g_nav, :crs, OSM_ref[])
     offset_dir = get_rotational_direction(g)
     set_prop!(g_nav, :offset_dir, offset_dir)
-    return g, g_nav
+    return g_nav
 end
 
 get_raw_ways(osm_json_object::AbstractDict) = LightOSM.osm_dict_from_json(osm_json_object)["way"]
@@ -615,4 +615,4 @@ function shadow_graph_from_download(download_method::Symbol;
         save_to_file_location=save_to_file_location;
         download_kwargs...)
     return shadow_graph_from_object(obj; network_type=network_type)
-    end
+end
