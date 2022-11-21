@@ -1,6 +1,7 @@
 using ShadowGraphs
 using LightOSM
 using Folium
+using Graphs
 using Test
 
 @testset "Circularity weirdness" begin
@@ -36,4 +37,6 @@ using Test
     println(neighs)
 end
 
+include("BuildGraph.jl")
+include("Persistence.jl")
 include("Plotting.jl")
