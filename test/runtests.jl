@@ -11,26 +11,28 @@ using Test
     selfloop_non_start = Way(1, [4,1,2,3,4], tags)
     
     for start_index in [1,2,3,4]
-        neighs = ShadowGraphs.get_neighbor_indices(roundabout_start_end, start_index, [1,3,5,7])
+        neighs = ShadowGraphs.get_neighbor_osm_ids(roundabout_start_end, start_index, [1,3,5,7])
         println(neighs)
     end
     println("")
     for start_index in [1,2,3,4]
-        neighs = ShadowGraphs.get_neighbor_indices(roundabout_non_start, start_index, [1,3,5,7])
+        neighs = ShadowGraphs.get_neighbor_osm_ids(roundabout_non_start, start_index, [1,3,5,7])
         println(neighs)
     end
     println("")
     for start_index in [1]
-        neighs = ShadowGraphs.get_neighbor_indices(selfloop_start, start_index, [1])
+        neighs = ShadowGraphs.get_neighbor_osm_ids(selfloop_start, start_index, [1])
         println(neighs)
     end
     println("")
     for start_index in [1]
-        neighs = ShadowGraphs.get_neighbor_indices(selfloop_start, start_index, [1])
+        neighs = ShadowGraphs.get_neighbor_osm_ids(selfloop_start, start_index, [1])
         println(neighs)
     end
     println("")
     lolipop = Way(1, [9,2,3,4,5,6,3], tags)
-    neighs = ShadowGraphs.get_neighbor_indices(lolipop, 1, [9])
+    neighs = ShadowGraphs.get_neighbor_osm_ids(lolipop, 1, [9])
     println(neighs)
 end
+
+include("Plotting.jl")

@@ -70,10 +70,13 @@ jobs:
       - name: Install non-registered repos
         run: julia --project=docs -e 'using Pkg; Pkg.add([PackageSpec(; path="./Folium.jl"), PackageSpec(; path="./CoolWalksUtils.jl")])'
       - uses: julia-actions/julia-buildpkg@v1
+        env:
+          PYTHON: ""
         with:
             project: 'docs'
       - uses: julia-actions/julia-docdeploy@v1
         env:
+          PYTHON: ""
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: |
           julia --project=docs -e '

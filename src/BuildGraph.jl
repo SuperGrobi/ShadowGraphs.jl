@@ -131,7 +131,7 @@ tuple with:
 - array of directions (either `+1` or -1`) that had to be taken from the start index to get to these neighbours
 (if you go "along" the `Way` or "against" it).
 """
-function get_neighbor__osm_ids(way::Way, start_id_index, nodes_in_nav_graph)
+function get_neighbor_osm_ids(way::Way, start_id_index, nodes_in_nav_graph)
     next_osm_ids = []
     used_directions = []
     if way.tags["oneway"]
