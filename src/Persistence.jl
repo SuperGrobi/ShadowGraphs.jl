@@ -11,10 +11,9 @@ saves the shadow graph to a selection of csv files:
 - `"path"_graph.csv` (contains graph properties)
 
 # arguments
-- path: path to the target directory. The different specifiers are appended to the filename given in this path.
-- graph: shadow graph to save
-- remove_internal_data: whether to remove internal data used for future calculations.
-(set this to true, if you do not need to be able to reimport the graph into `ShadowGraphs.jl` and want just the relevant "exposed" data)
+- `path`: path to the target directory. The different specifiers are appended to the filename given in this path.
+- `graph`: shadow graph to save
+- `remove_internal_data`: whether to remove internal data used for future calculations. (set this to true, if you do not need to be able to reimport the graph into `ShadowGraphs.jl` and want just the relevant "exposed" data)
 
 # returns
 saves multiple files to disk.

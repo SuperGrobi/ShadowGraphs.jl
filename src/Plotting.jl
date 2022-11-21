@@ -7,8 +7,9 @@ draws the given data series properies of the graph into a `Folium.jl` map.
 - fig::FoliumMap: map to draw in
 - g: shadow graph carying the data
 - series_type: type of data to draw from the graph. Pick from: `:vertices`, `:edges`, `:edgegeom`, `:shadowgeom`.
-- kwargs: keywords passed to folium for every `series_type`. (see the [python docs](https://python-visualization.github.io/folium/) 
-and the [leaflet docs](https://leafletjs.com/reference.html) for a full list of all options.) Every `series_type` has a few sensible defaults set,
+- kwargs: keywords passed to folium for every `series_type`. (see the [python docs](https://python-visualization.github.io/folium/) and the [leaflet docs](https://leafletjs.com/reference.html) for a full list of all options.) 
+
+Every `series_type` has a few sensible defaults set,
 most importantly the default tooltips and popups, which, by default show some interesting data about the vertices and edges, respectively.
 Currently, the `kwargs` are set for every element, there is (currently) no way to set parameters with, for example a vector, to get a element by
 element arguments.
@@ -68,8 +69,7 @@ same as `draw!`, but creates a new `FoliumMap` first.
 
 # argumnents
 - same as `draw!` plus:
-- figure_params: dictionary with arguments which are getting passed to the `FoliumMap` constructor (see the [python docs](https://python-visualization.github.io/folium/) 
-and the [leaflet docs](https://leafletjs.com/reference.html) for a full list of all options.)
+- figure_params: dictionary with arguments which are getting passed to the `FoliumMap` constructor (see the [python docs](https://python-visualization.github.io/folium/) and the [leaflet docs](https://leafletjs.com/reference.html) for a full list of all options.)
 
 # returns
 - the newly created figure
