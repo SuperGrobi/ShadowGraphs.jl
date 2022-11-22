@@ -50,7 +50,7 @@ end
     set_prop!(g, 2, :lat, -4.3)
 
     x, y = ShadowGraphs.offset_point_between(g, 1, 2)
-    @test sqrt((x-5.4)^2 + (y-10.3)^2) == sqrt((x-5.9)^2 + (y - -4.3)^2) 
+    @test sqrt((x-5.4)^2 + (y-10.3)^2) ≈ sqrt((x-5.9)^2 + (y - -4.3)^2) 
     @test_throws KeyError ShadowGraphs.offset_point_between(g, 1, 3)
 
     # add_edge_with_data
