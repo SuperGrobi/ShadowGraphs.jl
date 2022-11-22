@@ -323,7 +323,7 @@ end
         @test_throws BoundsError ShadowGraphs.get_node_list(ring3, 12, 60, -1)
     end
 end
-
+#=
 osm_g = graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)
 
 
@@ -335,3 +335,4 @@ ShadowGraphs.get_node_list(line1, 9, 60, -1)
 
 ring1 = Way(1, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"ring1"))
 ShadowGraphs.get_node_list(ring1, 9, 10, -1)
+=#
