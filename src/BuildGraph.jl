@@ -87,8 +87,7 @@ function add_edge_with_data!(g, s, d; data=Dict())
         id_2 = nv(g)
         add_edge!(g, id_2, d, :helper, true)
         add_edge_with_data!(g, id_1, id_2; data=data)
-    else
-        if has_edge(g, s, d)
+    elseif has_edge(g, s, d)
             #@warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
             # all of this is bad...
             lon_new, lat_new = offset_point_between(g, s, d)
@@ -97,11 +96,14 @@ function add_edge_with_data!(g, s, d; data=Dict())
             add_vertex!(g, Dict(:lat=>lat_new, :lon=>lon_new, :pointgeom=>p, :helper=>true))
             add_edge!(g, s, nv(g), :helper, true)
             add_edge_with_data!(g, nv(g), d; data=data)
-        else
-            add_edge!(g, s, d)
-            for (key, value) in data
-                set_prop!(g, s, d, key, value)
-            end
+    else
+        for i in [s, d]  # throw consistent errors
+            get_prop(g, i, :lon)
+            get_prop(g, i, :lat)
+        end
+        add_edge!(g, s, d)
+        for (key, value) in data
+            set_prop!(g, s, d, key, value)
         end
     end
 end
@@ -130,8 +132,40 @@ tuple with:
 - array of neighbouring osm ids
 - array of directions (either `+1` or -1`) that had to be taken from the start index to get to these neighbours
 (if you go "along" the `Way` or "against" it).
+
+# notes
+While we check if all nodes in `nodes_in_nav_graph` are in the `way`, we do not check if the order is correct.
+
+In addition, we expect the user to take care of the case where the start and end of the `way` are the same node and in the
+nav graph. You basically want to get rid of either the start or the end duplicate if they are in the nav graph. If you have 
+a `way`:
+
+    ring1 = Way(1, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"ring1"))
+
+with the nodes `[10, 30, 60, 80]` in your nav graph, you need to pass only this list and not something like `10, 30, 60, 80, 10]`.
+
+    # correct
+    get_neighbor_osm_ids(ring1, 1, [10, 30, 60, 80])  # ([80, 30], [-1, 1])
+    get_neighbor_osm_ids(ring1, 1, [30, 60, 80, 10])  # ([10, 60], [-1, 1])
+
+    # danger
+    get_neighbor_osm_ids(ring1, 1, [10, 30, 60, 80, 10])  # ([10, 30], [-1, 1])
+
+BUT! If you have a way like
+
+    loli1 = Way(1, [10,20,30,40,50,60,70, 30], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli1"))
+
+you want to preserve the order and the duplicates. For example `[10, 30, 60, 30]`, or, depending on the topology, maybe also `[10, 30, 30]`
+    
 """
 function get_neighbor_osm_ids(way::Way, start_id_index, nodes_in_nav_graph)
+    start_id_index ∉ 1:length(nodes_in_nav_graph) && throw(ArgumentError("the start_id_index $start_id_index is not a valid index of nodes_in_nav_graph ($nodes_in_nav_graph)."))
+    for node in nodes_in_nav_graph
+        node ∉ way.nodes && throw(ArgumentError("The node $node in nodes_in_nav_graph is not a part of the way (id: $(way.id), nodes: $(way.nodes))"))
+    end
+    if length(nodes_in_nav_graph) > 1 && nodes_in_nav_graph[1] == nodes_in_nav_graph[end]
+        throw(ArgumentError("the beginning of nodes_in_nav_graph is the same as the end. Generally, this is not good. $nodes_in_nav_graph, way_id=$(way.id)"))
+    end
     next_osm_ids = []
     used_directions = []
     if way.tags["oneway"]
@@ -191,16 +225,30 @@ are used.
 array with osm ids, with start id and destination id at start and end.
 """
 function get_node_list(way, start_pos, dest_osm_id, direction)
+    direction ∉ [-1, 1] && throw(ArgumentError("direction can only be 1 or -1. (currently: $direction)"))
+    if way.tags["oneway"]
+        if way.tags["reverseway"] && direction == 1
+            throw(ArgumentError("the direction $direction does not match the way (oneway, reverseway)"))
+        elseif !way.tags["reverseway"] && direction == -1
+            throw(ArgumentError("the direction $direction does not match the way (oneway, normal way)"))
+        end
+    end
     nodes = way.nodes
+    dest_osm_id ∉ nodes && throw(ArgumentError("the destination osm id $dest_osm_id is not in the way ($nodes)"))
     string_nodes = [nodes[start_pos]]
     current_pos = mod(start_pos + direction - 1, length(way.nodes)) + 1
+    is_cyclic = is_circular_way(way)
     while nodes[current_pos] != dest_osm_id
+        if !is_cyclic
+            if direction == 1 && current_pos < start_pos
+                throw(ArgumentError("the destinatoin $dest_osm_id can not be reached in the direction of 1."))
+            elseif direction == -1 && current_pos > start_pos
+                throw(ArgumentError("the destinatoin $dest_osm_id can not be reached in the direction of -1."))
+            end
+        end
         # exclude duplicates where rings close
         if !(way.nodes[current_pos] in string_nodes)
             push!(string_nodes, way.nodes[current_pos])
-        end
-        if current_pos == start_pos
-            throw(ArgumentError("the destination osm id $dest_osm_id is not in the way ($nodes)"))
         end
         current_pos = mod(current_pos + direction - 1, length(way.nodes)) + 1
     end
@@ -226,7 +274,7 @@ function nodelist_between(way, start_osm_id, dest_osm_id, direction)
     else
         length(start_pos) > 2 && @warn "the start node $start_osm_id apears $(length(start_pos)) times in the way."
         # this assumes, that nodes occure at most twice in every way
-        if start_osm_id == dest_osm_id
+        if start_osm_id == dest_osm_id  # if there are loop, take the long way around
             string_nodes = way.nodes[start_pos[1]:start_pos[end]]
         else  # this is for everything else, I assume that if I start from both nodes in the right direction, the shorter path will be the one I want...
             # the longer I think about it, this might actually be generally correct for all cases in this clause, due to the one dimensionality of ways.

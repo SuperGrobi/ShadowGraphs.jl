@@ -2,6 +2,7 @@ using ShadowGraphs
 using LightOSM
 using Folium
 using Graphs
+using MetaGraphs
 using Test
 
 @testset "Circularity weirdness" begin
