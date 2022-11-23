@@ -116,153 +116,6 @@ end
     @test !ShadowGraphs.is_circular_way(w2)
 
 
-    @testset "get_neighbor_osm_ids lines" begin
-        # get_neighbor_osm_ids
-        line1 = Way(1, [10,20,30,40,50,60,70,80], Dict("oneway"=>false, "reverseway"=>false, "name"=>"line1"))
-        line2 = Way(2, [10,20,30,40,50,60,70,80], Dict("oneway"=>true, "reverseway"=>false, "name"=>"line2"))
-        line3 = Way(3, [10,20,30,40,50,60,70,80], Dict("oneway"=>true, "reverseway"=>true, "name"=>"line3"))
-
-        nodes_in_nav_graph = [10, 40, 50, 70]
-
-        # line 1
-        @test ShadowGraphs.get_neighbor_osm_ids(line1, 1, nodes_in_nav_graph) == ([40], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(line1, 2, nodes_in_nav_graph) == ([10, 50], [-1, 1])
-        @test ShadowGraphs.get_neighbor_osm_ids(line1, 3, nodes_in_nav_graph) == ([40, 70], [-1, 1])
-        @test ShadowGraphs.get_neighbor_osm_ids(line1, 4, nodes_in_nav_graph) == ([50], [-1])
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(line1, 1, [10, 40, 55, 70])
-
-        # line 2
-        @test ShadowGraphs.get_neighbor_osm_ids(line2, 1, nodes_in_nav_graph) == ([40], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(line2, 2, nodes_in_nav_graph) == ([50], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(line2, 3, nodes_in_nav_graph) == ([70], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(line2, 4, nodes_in_nav_graph) == ([], [])
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(line2, 3, [10, 40, 55, 70])
-
-        # line 3
-        @test ShadowGraphs.get_neighbor_osm_ids(line3, 1, nodes_in_nav_graph) == ([], [])
-        @test ShadowGraphs.get_neighbor_osm_ids(line3, 2, nodes_in_nav_graph) == ([10], [-1])
-        @test ShadowGraphs.get_neighbor_osm_ids(line3, 3, nodes_in_nav_graph) == ([40], [-1])
-        @test ShadowGraphs.get_neighbor_osm_ids(line3, 4, nodes_in_nav_graph) == ([50], [-1])
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(line3, 3, [10, 40, 55, 70])
-    end
-
-    @testset "get_neighbor_osm_ids rings with duplicate in nav" begin
-        ring1 = Way(1, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"ring1"))
-        ring2 = Way(2, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>true, "reverseway"=>false, "name"=>"ring2"))
-        ring3 = Way(3, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>true, "reverseway"=>true, "name"=>"ring3"))
-        
-        nodes_in_nav_graph = [10, 30, 60, 70]
-
-        #ring 1
-        @test ShadowGraphs.get_neighbor_osm_ids(ring1, 1, nodes_in_nav_graph) == ([70, 30], [-1, 1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring1, 2, nodes_in_nav_graph) == ([10, 60], [-1, 1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring1, 3, nodes_in_nav_graph) == ([30, 70], [-1, 1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring1, 4, nodes_in_nav_graph) == ([60, 10], [-1, 1])
-
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(ring1, 0, [10, 40, 55, 70])
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(ring1, 0, [10, 30, 70, 10])
-
-        # ring 2
-        @test ShadowGraphs.get_neighbor_osm_ids(ring2, 1, nodes_in_nav_graph) == ([30], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring2, 2, nodes_in_nav_graph) == ([60], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring2, 3, nodes_in_nav_graph) == ([70], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring2, 4, nodes_in_nav_graph) == ([10], [1])
-
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(ring2, 0, [10, 40, 55, 70])
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(ring2, 2, [10, 40, 60, 10])
-
-        # ring 3
-        @test ShadowGraphs.get_neighbor_osm_ids(ring3, 1, nodes_in_nav_graph) == ([70], [-1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring3, 2, nodes_in_nav_graph) == ([10], [-1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring3, 3, nodes_in_nav_graph) == ([30], [-1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring3, 4, nodes_in_nav_graph) == ([60], [-1])
-
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(ring3, 0, [10, 40, 55, 70])
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(ring3, 2, [10, 40, 60, 10])
-    end
-
-    @testset "get_neighbor_osm_ids rings without duplicate in nav" begin
-        ring1 = Way(1, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"ring1"))
-        ring2 = Way(2, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>true, "reverseway"=>false, "name"=>"ring2"))
-        ring3 = Way(3, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>true, "reverseway"=>true, "name"=>"ring3"))
-        
-        nodes_in_nav_graph = [20, 40, 60, 70]
-
-        #ring 1
-        @test ShadowGraphs.get_neighbor_osm_ids(ring1, 1, nodes_in_nav_graph) == ([70, 40], [-1, 1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring1, 2, nodes_in_nav_graph) == ([20, 60], [-1, 1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring1, 3, nodes_in_nav_graph) == ([40, 70], [-1, 1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring1, 4, nodes_in_nav_graph) == ([60, 20], [-1, 1])
-
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(ring1, 0, [10, 40, 55, 70])
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(ring1, 0, [10, 30, 70, 10])
-
-        # ring 2
-        @test ShadowGraphs.get_neighbor_osm_ids(ring2, 1, nodes_in_nav_graph) == ([40], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring2, 2, nodes_in_nav_graph) == ([60], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring2, 3, nodes_in_nav_graph) == ([70], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring2, 4, nodes_in_nav_graph) == ([20], [1])
-
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(ring2, 0, [10, 40, 55, 70])
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(ring2, 2, [10, 40, 60, 10])
-
-        # ring 3
-        @test ShadowGraphs.get_neighbor_osm_ids(ring3, 1, nodes_in_nav_graph) == ([70], [-1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring3, 2, nodes_in_nav_graph) == ([20], [-1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring3, 3, nodes_in_nav_graph) == ([40], [-1])
-        @test ShadowGraphs.get_neighbor_osm_ids(ring3, 4, nodes_in_nav_graph) == ([60], [-1])
-
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(ring3, 0, [10, 40, 55, 70])
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(ring3, 2, [10, 40, 60, 10])
-    end
-
-    @testset "get_neighbor_osm_ids lolipops" begin
-        loli1 = Way(1, [10,20,30,40,50,60,70, 30], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli1"))
-        loli2 = Way(2, [10,20,30,40,50,60,70, 30], Dict("oneway"=>true, "reverseway"=>false, "name"=>"loli2"))
-        loli3 = Way(3, [10,20,30,40,50,60,70, 30], Dict("oneway"=>true, "reverseway"=>true, "name"=>"loli3"))
-
-        nodes_in_nav_graph = [10, 30, 60, 30]
-
-        #loli1
-        @test ShadowGraphs.get_neighbor_osm_ids(loli1, 1, nodes_in_nav_graph) == ([30], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(loli1, 2, nodes_in_nav_graph) == ([10, 60], [-1, 1])
-        @test ShadowGraphs.get_neighbor_osm_ids(loli1, 3, nodes_in_nav_graph) == ([30, 30], [-1, 1])
-        @test ShadowGraphs.get_neighbor_osm_ids(loli1, 4, nodes_in_nav_graph) == ([60], [-1])
-
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(loli1, 0, nodes_in_nav_graph)
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(loli1, 2, [10, 25, 30, 25])
-
-        #loli2
-        @test ShadowGraphs.get_neighbor_osm_ids(loli2, 1, nodes_in_nav_graph) == ([30], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(loli2, 2, nodes_in_nav_graph) == ([60], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(loli2, 3, nodes_in_nav_graph) == ([30], [1])
-        @test ShadowGraphs.get_neighbor_osm_ids(loli2, 4, nodes_in_nav_graph) == ([], [])
-
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(loli2, 0, nodes_in_nav_graph)
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(loli2, 2, [10, 25, 30, 25])
-
-        #loli3
-        @test ShadowGraphs.get_neighbor_osm_ids(loli3, 1, nodes_in_nav_graph) == ([], [])
-        @test ShadowGraphs.get_neighbor_osm_ids(loli3, 2, nodes_in_nav_graph) == ([10], [-1])
-        @test ShadowGraphs.get_neighbor_osm_ids(loli3, 3, nodes_in_nav_graph) == ([30], [-1])
-        @test ShadowGraphs.get_neighbor_osm_ids(loli3, 4, nodes_in_nav_graph) == ([60], [-1])
-
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(loli3, 0, nodes_in_nav_graph)
-        @test_throws ArgumentError ShadowGraphs.get_neighbor_osm_ids(loli3, 2, [10, 25, 30, 25])
-    end
-
-    @testset "is_lolipop_node" begin
-        osm_g = graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)
-        @test ShadowGraphs.is_lolipop_node(osm_g, 323231794)
-        @test ShadowGraphs.is_lolipop_node(osm_g, 322852698)
-        @test ShadowGraphs.is_lolipop_node(osm_g, 322837719)
-        @test !ShadowGraphs.is_lolipop_node(osm_g, 323204711)
-        @test !ShadowGraphs.is_lolipop_node(osm_g, 2307602759)
-        @test !ShadowGraphs.is_lolipop_node(osm_g, 323204751)
-        @test !ShadowGraphs.is_lolipop_node(osm_g, 26955809)
-        @test !ShadowGraphs.is_lolipop_node(osm_g, 3726792252)
-    end
-
     @testset "get_node_list lines" begin
         line1 = Way(1, [10,20,30,40,50,60,70,80], Dict("oneway"=>false, "reverseway"=>false, "name"=>"line1"))
         line2 = Way(2, [10,20,30,40,50,60,70,80], Dict("oneway"=>true, "reverseway"=>false, "name"=>"line2"))
@@ -336,6 +189,8 @@ end
         loli_reverse = Way(4, [10,20,30,40,10, 50, 60], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
         stresstest_open = Way(5, [10, 20, 30, 40, 50, 60, 70, 50, 30, 80, 90], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
         stresstest_closed = Way(6, [10, 20, 30, 40, 20, 50, 60, 60, 70, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
+        clover = Way(7, [10, 20, 30, 40, 20, 50, 60, 20, 70, 80, 20], Dict("oneway"=>false, "reverseway"=>false, "name"=>"clover"))
+
         
         line_decomp = ShadowGraphs.decompose_way_to_primitives(line)
         ring_decomp = ShadowGraphs.decompose_way_to_primitives(ring)
@@ -343,6 +198,7 @@ end
         loli_reverse_decomp = ShadowGraphs.decompose_way_to_primitives(loli_reverse)
         stresstest_open_decomp = ShadowGraphs.decompose_way_to_primitives(stresstest_open)
         stresstest_closed_decomp = ShadowGraphs.decompose_way_to_primitives(stresstest_closed)
+        clover_decomp = ShadowGraphs.decompose_way_to_primitives(clover)
 
         @test length(line_decomp) == 1
         @test line_decomp[1].id == line.id
@@ -376,6 +232,13 @@ end
         @test stresstest_closed_decomp[2].nodes == [20,50,60]
         @test stresstest_closed_decomp[3].nodes == [60,60]
         @test stresstest_closed_decomp[4].nodes == [60,70,10,20]
+
+        @test length(clover_decomp) == 4
+        @test all([i.id == clover.id for i in clover_decomp])
+        @test clover_decomp[1].nodes == [10, 20]
+        @test clover_decomp[2].nodes == [20,30,40,20]
+        @test clover_decomp[3].nodes == [20,50,60,20]
+        @test clover_decomp[4].nodes == [20,70,80,20]
     end
 
     @testset "add_this_node" begin
@@ -401,16 +264,3 @@ end
         @test !ShadowGraphs.add_this_node(g, 323203074)  # another random node
     end
 end
-#=
-osm_g = graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)
-
-
-line1 = Way(1, [10,20,30,40,50,60,70,80], Dict("oneway"=>false, "reverseway"=>false, "name"=>"line1"))
-line2 = Way(2, [10,20,30,40,50,60,70,80], Dict("oneway"=>true, "reverseway"=>false, "name"=>"line2"))
-line3 = Way(3, [10,20,30,40,50,60,70,80], Dict("oneway"=>true, "reverseway"=>true, "name"=>"line3"))
-
-ShadowGraphs.get_node_list(line1, 9, 60, -1)
-
-ring1 = Way(1, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"ring1"))
-ShadowGraphs.get_node_list(ring1, 9, 10, -1)
-=#

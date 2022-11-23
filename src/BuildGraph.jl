@@ -72,32 +72,31 @@ This process is nessecary to preserve the street network topology, since `MetaDi
 function add_edge_with_data!(g, s, d; data=Dict())
     if s == d  # if we are about to add a self-loop
         #@warn "trying to add self loop for node $(get_prop(g, s, :osm_id)) ($s)"
-        lat_start = get_prop(g, s, :lat)
-        lon_start = get_prop(g, s, :lon)
-        lons, lats= point_on_radius(lon_start, lat_start, 0.0003)
-        # TODO: add archGDAL point to props
-        p1 = ArchGDAL.createpoint(lons[1], lats[1])
+        geomlength = ArchGDAL.geomlength(data[:edgegeom])
+
+        p1 = ArchGDAL.pointalongline(data[:edgegeom], 0.1 * geomlength)
         apply_wsg_84!(p1)
-        add_vertex!(g, Dict(:lat=>lats[1], :lon=>lons[1], :pointgeom=>p1, :helper=>true))
+        add_vertex!(g, Dict(:lon=>ArchGDAL.getx(p1, 0), :lat=>ArchGDAL.gety(p1, 0), :pointgeom=>p1, :helper=>true))
         id_1 =nv(g)
         add_edge!(g, s, id_1, :helper, true)
-        p2 = ArchGDAL.createpoint(lons[2], lats[2])
+        
+        p2 = ArchGDAL.pointalongline(data[:edgegeom], 0.6 * geomlength)
         apply_wsg_84!(p2)
-        add_vertex!(g, Dict(:lat=>lats[2], :lon=>lons[2], :pointgeom=>p2, :helper=>true))
+        add_vertex!(g, Dict(:lon=>ArchGDAL.getx(p2, 0), :lat=>ArchGDAL.gety(p2, 0), :pointgeom=>p2, :helper=>true))
         id_2 = nv(g)
         add_edge!(g, id_2, d, :helper, true)
+
         add_edge_with_data!(g, id_1, id_2; data=data)
     elseif has_edge(g, s, d)
             #@warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
             # all of this is bad...
-            lon_new, lat_new = offset_point_between(g, s, d)
-            p = ArchGDAL.createpoint(lon_new, lat_new)
+            p = ArchGDAL.pointalongline(data[:edgegeom], 0.5 * ArchGDAL.geomlength(data[:edgegeom]))
             apply_wsg_84!(p)
-            add_vertex!(g, Dict(:lat=>lat_new, :lon=>lon_new, :pointgeom=>p, :helper=>true))
+            add_vertex!(g, Dict(:lon=>ArchGDAL.getx(p, 0), :lat=>ArchGDAL.gety(p, 0), :pointgeom=>p, :helper=>true))
             add_edge!(g, s, nv(g), :helper, true)
             add_edge_with_data!(g, nv(g), d; data=data)
     else
-        for i in [s, d]  # throw consistent errors
+        for i in [s, d]  # throw consistent errors TODO: fix this.
             get_prop(g, i, :lon)
             get_prop(g, i, :lat)
         end
@@ -158,176 +157,6 @@ function decompose_way_to_primitives(way::Way)
         sub_nodes = [sub_nodes[2:end-1]; [[sub_nodes[end]; sub_nodes[1][2:end]]]]
     end
     return [Way(way.id, nodes, way.tags) for nodes in sub_nodes]
-end
-
-"""
-    get_neighbor_osm_ids(way::Way, start_id_index, nodes_in_nav_graph)
-
-gets the osm ids of directly connected nodes in the reduced (topological) graph along the `way`.
-The starting node from which the neighbour ids are to be calculated is assumed to be at index `start_id_index`
-in the array `nodes_in_nav_graph`.
-
-# arguments
-- way: `Way` along which the neighbours are situated.
-- start_id_index: index of the start node in `nodes_in_nav_graph`
-- `nodes_in_nav_graph`: array with osm ids of the nodes which form the `way`, which are also topologically relevant.
-
-# returns
-tuple with:
-- array of neighbouring osm ids
-- array of directions (either `+1` or -1`) that had to be taken from the start index to get to these neighbours
-(if you go "along" the `Way` or "against" it).
-
-# notes
-While we check if all nodes in `nodes_in_nav_graph` are in the `way`, we do not check if the order is correct.
-
-In addition, we expect the user to take care of the case where the start and end of the `way` are the same node and in the
-nav graph. You basically want to get rid of either the start or the end duplicate if they are in the nav graph. If you have 
-a `way`:
-
-    ring1 = Way(1, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"ring1"))
-
-with the nodes `[10, 30, 60, 80]` in your nav graph, you need to pass only this list and not something like `10, 30, 60, 80, 10]`.
-
-    # correct
-    get_neighbor_osm_ids(ring1, 1, [10, 30, 60, 80])  # ([80, 30], [-1, 1])
-    get_neighbor_osm_ids(ring1, 1, [30, 60, 80, 10])  # ([10, 60], [-1, 1])
-
-    # danger
-    get_neighbor_osm_ids(ring1, 1, [10, 30, 60, 80, 10])  # ([10, 30], [-1, 1])
-
-BUT! If you have a way like
-
-    loli1 = Way(1, [10,20,30,40,50,60,70, 30], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli1"))
-
-you want to preserve the order and the duplicates. For example `[10, 30, 60, 30]`, or, depending on the topology, maybe also `[10, 30, 30]`
-    
-"""
-function get_neighbor_osm_ids(way::Way, start_id_index, nodes_in_nav_graph)
-    start_id_index ∉ 1:length(nodes_in_nav_graph) && throw(ArgumentError("the start_id_index $start_id_index is not a valid index of nodes_in_nav_graph ($nodes_in_nav_graph)."))
-    for node in nodes_in_nav_graph
-        node ∉ way.nodes && throw(ArgumentError("The node $node in nodes_in_nav_graph is not a part of the way (id: $(way.id), nodes: $(way.nodes))"))
-    end
-    if length(nodes_in_nav_graph) > 1 && nodes_in_nav_graph[1] == nodes_in_nav_graph[end]
-        throw(ArgumentError("the beginning of nodes_in_nav_graph is the same as the end. Generally, this is not good. $nodes_in_nav_graph, way_id=$(way.id)"))
-    end
-    next_osm_ids = []
-    used_directions = []
-    if way.tags["oneway"]
-        step_directions = way.tags["reverseway"] ? [-1] : [1]
-    else
-        step_directions = [-1, 1]
-    end
-    for step_direction in step_directions
-        next_index = start_id_index + step_direction
-        if 1<= next_index <= length(nodes_in_nav_graph)
-            push!(next_osm_ids, nodes_in_nav_graph[next_index])
-            push!(used_directions, step_direction)
-        elseif is_circular_way(way)
-            corrected_index = mod(next_index - 1, length(nodes_in_nav_graph)) + 1
-            push!(next_osm_ids, nodes_in_nav_graph[corrected_index])
-            push!(used_directions, step_direction)
-        end
-    end
-    return next_osm_ids, used_directions
-end
-
-"""
-    is_lolipop_node(g, osm_id)
-
-checks if the node with `osm_id` is a "lolipop node" in the `LightOSM.OSMGraph` graph. A "lolipop node" is a node which
-occurs at the start/end of a way, as well as somewhere in the middle. (For example, the node `1` is considered a "lolipop node""
-in the following way: `1-2-3-4-5-1-6-7`)
-"""
-function is_lolipop_node(g, osm_id)
-    ocurrences = []
-    is_not_circular = []
-    for way_id in g.node_to_way[osm_id]
-        way = g.ways[way_id]
-        nodes = way.nodes
-        ocur_in_way = count(x->x==osm_id, nodes)
-        push!(ocurrences, ocur_in_way)
-        push!(is_not_circular, !is_circular_way(way))
-        ocur_in_way > 2 && @warn "the node $osm_id is contained $ocur_in_way in a way. better check that out..."
-    end
-    return any(ocurrences .== 2 .&& is_not_circular)
-end
-
-"""
-    get_node_list(way, start_pos, dest_osm_id, direction)
-    
-returns a list of all osm node ids between the `start_pos` and the destination node given by `dest_osm_id`,
-with step direction of `direction`. If either end of the array is reached during the steps, periodic boundaries
-are used.
-
-# arguments
-- `way`: `Way` whose nodes should be used
-- `start_pos` start index in `way.nodes` (NOT the osm_id of the start node)
-- `dest_osm_id` osm id of the destination node
-- `direction` direction in which the node list should be steped through in order to find the destination osm id.
-
-# returns
-array with osm ids, with start id and destination id at start and end.
-"""
-function get_node_list(way, start_pos, dest_osm_id, direction)
-    direction ∉ [-1, 1] && throw(ArgumentError("direction can only be 1 or -1. (currently: $direction)"))
-    if way.tags["oneway"]
-        if way.tags["reverseway"] && direction == 1
-            throw(ArgumentError("the direction $direction does not match the way (oneway, reverseway)"))
-        elseif !way.tags["reverseway"] && direction == -1
-            throw(ArgumentError("the direction $direction does not match the way (oneway, normal way)"))
-        end
-    end
-    nodes = way.nodes
-    dest_osm_id ∉ nodes && throw(ArgumentError("the destination osm id $dest_osm_id is not in the way ($nodes)"))
-    string_nodes = [nodes[start_pos]]
-    current_pos = mod(start_pos + direction - 1, length(way.nodes)) + 1
-    is_cyclic = is_circular_way(way)
-    while nodes[current_pos] != dest_osm_id
-        if !is_cyclic
-            if direction == 1 && current_pos < start_pos
-                throw(ArgumentError("the destination $dest_osm_id can not be reached in the direction of 1 in way $(way.id) from $(way.nodes[start_pos]), with index $start_pos"))
-            elseif direction == -1 && current_pos > start_pos
-                throw(ArgumentError("the destination $dest_osm_id can not be reached in the direction of -1 in way $(way.id) from $(way.nodes[start_pos]), with index $start_pos"))
-            end
-        end
-        # exclude duplicates where rings close
-        if !(way.nodes[current_pos] in string_nodes)
-            push!(string_nodes, way.nodes[current_pos])
-        end
-        current_pos = mod(current_pos + direction - 1, length(way.nodes)) + 1
-    end
-    push!(string_nodes, way.nodes[current_pos])
-    return string_nodes
-end
-
-"""
-    nodelist_between(way, start_osm_id, dest_osm_id, direction)
-
-builds the list of osm node ids in the way which are between the start and destination osm id (inclusively),
-by taking steps through the list of nodes in the direction of `direction`.
-
-If the start osm id occurs twice in the way, the shorter list is returned.
-"""
-function nodelist_between(way, start_osm_id, dest_osm_id, direction)
-    # find start and end index in way.nodes and take everything in between
-    start_pos = findall(x->x==start_osm_id, way.nodes)
-     
-    if length(start_pos) == 1
-        start_pos = first(start_pos)
-        string_nodes = get_node_list(way, start_pos, dest_osm_id, direction)
-    else
-        length(start_pos) > 2 && @warn "the start node $start_osm_id apears $(length(start_pos)) times in the way."
-        # this assumes, that nodes occure at most twice in every way
-        if start_osm_id == dest_osm_id  # if there are loop, take the long way around
-            string_nodes = way.nodes[start_pos[1]:start_pos[end]]
-        else  # this is for everything else, I assume that if I start from both nodes in the right direction, the shorter path will be the one I want...
-            # the longer I think about it, this might actually be generally correct for all cases in this clause, due to the one dimensionality of ways.
-            node_lists = [get_node_list(way, start, dest_osm_id, direction) for start in start_pos]
-            string_nodes = node_lists[findmin(length, node_lists)[2]]
-        end
-    end
-    return string_nodes
 end
 
 """
@@ -523,6 +352,38 @@ end
 
 
 """
+
+    get_node_list(way, start_osm_id, topological_nodes, direction) 
+
+tries to get list of osm ids in way between the start_osm_id and the next topologically relevant node in direction of `direction`.
+Returns either `Int[]` or `nothing` if there is no relevant node in direction of `direction`
+"""
+function get_node_list(way, start_osm_id, topological_nodes, direction)
+    # direction in -1, 1
+    #topo nodes in way.nodes
+    #start id in topo nodes and way.nodes
+
+    all_nodes = way.nodes
+    # in every simple way, at most the the start and end node are the same
+    if is_circular_way(simple_way) # start and end node are the same
+                    
+    else # everything is unique, nothing is periodic
+
+        # get index of start node in full and in reduced nodes list
+        all_start_index = findfirst(==(start_osm_id), all_nodes)
+        topological_start_index = findfirst(==(start_osm_id), topological_nodes)
+
+        try
+            destination_osm_id = topological_nodes[start_index+step]
+            all_destination_index = findfirst(==(destination_osm_id), all_nodes)
+            nodelist_inbetween = all_nodes[all_start_index:step:all_destination_index]
+        catch e
+            e isa BoundsError ? continue : rethrow(e)
+        end 
+    end
+end
+
+"""
     shadow_graph_from_light_osm_graph(g)
 
 transforms a `LightOSM.OSMGraph` into a `MetaDiGraph`, containing only the topologically relevant
@@ -560,7 +421,7 @@ function shadow_graph_from_light_osm_graph(g)
     # build clean graph containing only nodes for topologically relevant nodes
     g_nav = MetaDiGraph()
 
-    # add only those nodes, which are part of two or more ways
+    # add only those nodes, which are relevant for topology
     for (osm_id, way_ids) in g.node_to_way
         if add_this_node(g, osm_id)
             lat_point = g.nodes[osm_id].location.lat
@@ -586,41 +447,36 @@ function shadow_graph_from_light_osm_graph(g)
         start_osm_id = get_prop(g_nav, start_node_id, :osm_id)
         ways = [g.ways[way_id] for way_id in g.node_to_way[start_osm_id]]
         for way in ways
-            nodes_in_nav_graph = [node for node in way.nodes if node in osm_ids]
-            all_nodes_in_ng = copy(nodes_in_nav_graph)
-            # cut of duplicate node, if the way starts and ends here. (also be carefull of cirlces on a stick.)
-            if length(nodes_in_nav_graph) > 1 && nodes_in_nav_graph[1] == nodes_in_nav_graph[end]
-                nodes_in_nav_graph = nodes_in_nav_graph[1:end-1]
-            end
+            # decompose way and filter to only include the ones in which the start node is contained
+            simple_ways = filter(simple_way->start_osm_id ∈ simple_way.nodes, decompose_way_to_primitives(way))
+            for simple_way in simple_ways
+                # define possible directions in which we are allowed to step through the way
+                if simple_way.tags["oneway"]
+                    step_directions = simple_way.tags["reverseway"] ? [-1] : [1]
+                else
+                    step_directions = [-1, 1]
+                end
 
-            start_id_indices = findall(x->x==start_osm_id, nodes_in_nav_graph)
-            if length(start_id_indices)!=1 && !is_lolipop_node(g, start_osm_id)
-                @warn "the start node $start_osm_id is $(length(start_id_indices)) times in the shortened way."
-                @warn all_nodes_in_ng
-                @warn "while adding way $(way.id)"
-            end
+                all_nodes = simple_way.nodes
+                topological_nodes = [node for node in all_nodes if node in osm_ids]
 
-            for start_id_index in start_id_indices
-                neighbor_indices, step_directions = get_neighbor_osm_ids(way, start_id_index, nodes_in_nav_graph)
-                for (next_osm_id, step_direction) in zip(neighbor_indices, step_directions)
-                    next_nav_id = osm_id_to_nav_id[next_osm_id]
-                    node_id_list = nodelist_between(way, start_osm_id, next_osm_id, step_direction)
-                    linestring = geolinestring(g.nodes, node_id_list)
+                for step in step_directions
+                    nodelist_start_destination = get_node_list(way, start_osm_id, topological_nodes, step)
+                    nodelist_start_destination === nothing && continue
+                    linestring = geolinestring(g.nodes, nodelist_start_destination) 
                     data = Dict(
-                        :(osm_id) => way.id,
-                        :tags => way.tags,
+                        :(osm_id) => simple_way.id,
+                        :tags => simple_way.tags,
                         :edgegeom => linestring,
                         :geomlength => 0,
-                        :parsing_direction => step_direction,
+                        :parsing_direction => step,
                         :helper => false
                     )
-                    add_edge_with_data!(g_nav, start_node_id, next_nav_id; data=data)
+                    add_edge_with_data!(g_nav, start_node_id, nodelist_start_destination[end]; data=data)
                 end
             end
         end
-    end
-
-    
+    end    
     set_prop!(g_nav, :crs, OSM_ref[])
     offset_dir = get_rotational_direction(g)
     set_prop!(g_nav, :offset_dir, offset_dir)

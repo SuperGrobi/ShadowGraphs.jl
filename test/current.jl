@@ -236,3 +236,10 @@ g_osm.node_to_way
 g_osm.ways
 
 ShadowGraphs.add_this_node(g_osm, 323203074)
+
+
+a = try
+    a = [1,2,3][6]
+catch
+end
+a
