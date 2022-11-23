@@ -218,3 +218,21 @@ function prnlist(l)
 end
 
 prnlist(x)
+
+line = Way(1, [10,20,30,40,50,60,70,80], Dict("oneway"=>false, "reverseway"=>false, "name"=>"line"))
+ring = Way(2, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"ring"))
+
+loli = Way(3, [10,20,30,40,50,60,70, 30], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
+loli_reverse = Way(4, [10,20,30,40,10, 50, 60], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
+
+stresstest_open = Way(5, [10, 20, 30, 40, 50, 60, 70, 50, 30, 80, 90], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
+stresstest_closed = Way(6, [10, 20, 30, 40, 20, 50, 60, 60, 70, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
+ShadowGraphs.decompose_way_to_primitives(ring)
+
+g_osm = graph_from_file("./test/data/test_clifton_bike.json"; network_type=:bike)
+
+g_osm.node_to_way
+
+g_osm.ways
+
+ShadowGraphs.add_this_node(g_osm, 323203074)

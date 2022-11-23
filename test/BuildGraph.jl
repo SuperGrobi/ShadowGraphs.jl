@@ -322,6 +322,84 @@ end
         @test_throws ArgumentError ShadowGraphs.get_node_list(ring3, 2, 65, 1)
         @test_throws BoundsError ShadowGraphs.get_node_list(ring3, 12, 60, -1)
     end
+
+    @testset "countall" begin
+        @test ShadowGraphs.countall([1,2,3,1,2]) == Dict(1=>2, 2=>2, 3=>1)
+        @test ShadowGraphs.countall([1,1,1,1,1]) == Dict(1=>5)
+        @test ShadowGraphs.countall([1,2,3]) == Dict(1=>1, 2=>1, 3=>1)
+    end
+
+    @testset "decompose_way_to_primitives" begin
+        line = Way(1, [10,20,30,40,50,60,70,80], Dict("oneway"=>false, "reverseway"=>false, "name"=>"line"))
+        ring = Way(2, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"ring"))
+        loli = Way(3, [10,20,30,40,50,60,70, 30], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
+        loli_reverse = Way(4, [10,20,30,40,10, 50, 60], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
+        stresstest_open = Way(5, [10, 20, 30, 40, 50, 60, 70, 50, 30, 80, 90], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
+        stresstest_closed = Way(6, [10, 20, 30, 40, 20, 50, 60, 60, 70, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
+        
+        line_decomp = ShadowGraphs.decompose_way_to_primitives(line)
+        ring_decomp = ShadowGraphs.decompose_way_to_primitives(ring)
+        loli_decomp = ShadowGraphs.decompose_way_to_primitives(loli)
+        loli_reverse_decomp = ShadowGraphs.decompose_way_to_primitives(loli_reverse)
+        stresstest_open_decomp = ShadowGraphs.decompose_way_to_primitives(stresstest_open)
+        stresstest_closed_decomp = ShadowGraphs.decompose_way_to_primitives(stresstest_closed)
+
+        @test length(line_decomp) == 1
+        @test line_decomp[1].id == line.id
+        @test line_decomp[1].nodes == line.nodes
+
+        @test length(ring_decomp) == 1
+        @test ring_decomp[1].id == ring.id
+        @test ring_decomp[1].nodes == ring.nodes
+        
+        @test length(loli_decomp) == 2
+        @test all([i.id == loli.id for i in loli_decomp])
+        @test loli_decomp[1].nodes == [10,20,30]
+        @test loli_decomp[2].nodes == [30,40,50,60,70,30]
+
+        @test length(loli_reverse_decomp) == 2
+        @test all([i.id == loli_reverse.id for i in loli_reverse_decomp])
+        @test loli_reverse_decomp[1].nodes == [10,20,30,40,10]
+        @test loli_reverse_decomp[2].nodes == [10,50,60]
+
+        @test length(stresstest_open_decomp) == 5
+        @test all([i.id == stresstest_open.id for i in stresstest_open_decomp])
+        @test stresstest_open_decomp[1].nodes == [10,20,30]
+        @test stresstest_open_decomp[2].nodes== [30,40,50]
+        @test stresstest_open_decomp[3].nodes == [50,60,70,50]
+        @test stresstest_open_decomp[4].nodes == [50,30]
+        @test stresstest_open_decomp[5].nodes == [30,80,90]
+
+        @test length(stresstest_closed_decomp) == 4
+        @test all([i.id == stresstest_closed.id for i in stresstest_closed_decomp])
+        @test stresstest_closed_decomp[1].nodes == [20,30,40,20]
+        @test stresstest_closed_decomp[2].nodes == [20,50,60]
+        @test stresstest_closed_decomp[3].nodes == [60,60]
+        @test stresstest_closed_decomp[4].nodes == [60,70,10,20]
+    end
+
+    @testset "add_this_node" begin
+        g = graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)
+        @test ShadowGraphs.add_this_node(g, 323204711)  # roundabout, start-end
+        @test ShadowGraphs.add_this_node(g, 323203082)  # intersection
+        @test ShadowGraphs.add_this_node(g, 323231794)  # lolipop
+        @test ShadowGraphs.add_this_node(g, 323204751)  # roundabout exit, non start
+        @test ShadowGraphs.add_this_node(g, 322837719)  # lolipop
+        @test ShadowGraphs.add_this_node(g, 446038083)  # circle without other exits (on a stick)
+        @test ShadowGraphs.add_this_node(g, 2679172848) # end of road
+        @test ShadowGraphs.add_this_node(g, 2675918319) # lolipop with broken ring
+        @test ShadowGraphs.add_this_node(g, 2675918517) # exit from lolipop
+
+        @test !ShadowGraphs.add_this_node(g, 323204750)  # roundabout non relevant
+        @test !ShadowGraphs.add_this_node(g, 323232942)  # start/end of circle, but no entry/exit
+        @test !ShadowGraphs.add_this_node(g, 2941956390)  # center of cyclepath
+        @test !ShadowGraphs.add_this_node(g, 322834114)   # lolipop, between exits
+        @test !ShadowGraphs.add_this_node(g, 2675918248)  # part of lolipop stem
+        @test !ShadowGraphs.add_this_node(g, 2675918306)  # roundabout non exit
+        @test !ShadowGraphs.add_this_node(g, 323227343)   # some node along street
+        @test !ShadowGraphs.add_this_node(g, 1647848982)  # another random node
+        @test !ShadowGraphs.add_this_node(g, 323203074)  # another random node
+    end
 end
 #=
 osm_g = graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)

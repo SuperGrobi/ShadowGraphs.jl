@@ -116,6 +116,51 @@ checks if a `LightOSM.Way` way starts at the same node it ends.
 is_circular_way(way::Way) = way.nodes[1] == way.nodes[end]
 
 """
+    countall(numbers)
+
+counts how often every number appears in numbers. Returns dict with `number=>count`
+"""
+countall(numbers) = Dict(number=>count(==(number), numbers) for number in unique(numbers))
+
+"""
+
+    decompose_way_to_primitives(way::Way)
+
+Decomposed a `way` with possible self-intersections/loops into multiple ways which are guaranteed to be either
+- non-intersecting lines, where every node in the way is unique, or
+- circular ways, where only the first and last node in the way are not unique.
+
+# example
+a simple `way` with nodes `[10,20,30,40,50,30]` (which looks like a triangle on a stick, not the repeated `30`) will
+be decomposed into two ways, with the nodes `[10,20,30]` and `[30,40,50,30]`.
+"""
+function decompose_way_to_primitives(way::Way)
+    length(way.nodes) <= 1 && throw(ArgumentError("there are less than two nodes in way $(way.id)"))
+    nodecounts = countall(way.nodes)
+    duplicate_nodes = filter(x->x.second > 1, nodecounts)
+    cut_locations = findall(n->n ∈ keys(duplicate_nodes), way.nodes)
+
+    # if nowhere to cut (straight line) or if ring without intersection
+    if length(cut_locations) == 0 || cut_locations == [1, length(way.nodes)]
+        return [way]
+    end
+
+    # from here on, cut_locations is at least one element long
+    if cut_locations[1] != 1
+        cut_locations = [1; cut_locations]
+    end
+    if cut_locations[end] != length(way.nodes)
+        push!(cut_locations, length(way.nodes))
+    end
+    # from here, there are at least three cut locations, including start and end point
+    sub_nodes = [way.nodes[s:d] for (s, d) in zip(cut_locations[1:end-1], cut_locations[2:end])]
+    if is_circular_way(way)
+        sub_nodes = [sub_nodes[2:end-1]; [[sub_nodes[end]; sub_nodes[1][2:end]]]]
+    end
+    return [Way(way.id, nodes, way.tags) for nodes in sub_nodes]
+end
+
+"""
     get_neighbor_osm_ids(way::Way, start_id_index, nodes_in_nav_graph)
 
 gets the osm ids of directly connected nodes in the reduced (topological) graph along the `way`.
@@ -241,9 +286,9 @@ function get_node_list(way, start_pos, dest_osm_id, direction)
     while nodes[current_pos] != dest_osm_id
         if !is_cyclic
             if direction == 1 && current_pos < start_pos
-                throw(ArgumentError("the destinatoin $dest_osm_id can not be reached in the direction of 1."))
+                throw(ArgumentError("the destination $dest_osm_id can not be reached in the direction of 1 in way $(way.id) from $(way.nodes[start_pos]), with index $start_pos"))
             elseif direction == -1 && current_pos > start_pos
-                throw(ArgumentError("the destinatoin $dest_osm_id can not be reached in the direction of -1."))
+                throw(ArgumentError("the destination $dest_osm_id can not be reached in the direction of -1 in way $(way.id) from $(way.nodes[start_pos]), with index $start_pos"))
             end
         end
         # exclude duplicates where rings close
@@ -445,6 +490,39 @@ end
 
 
 """
+
+    add_this_node(g, osm_id)
+
+checks if the node with `osm_id` in graph `g` should be added to the shadow graph. Churrently, we add a node if one of the following is true:
+- if the number of ways the node is part of is larger than 1
+- if the node is the end of a street, that is, if he has only one neighbour in `g`
+- if the node occurs more than once in the way it is part of, excluding the end point, if the way is circular
+"""
+function add_this_node(g, osm_id)
+    index = g.node_to_index[osm_id]
+    way_ids = g.node_to_way[osm_id]
+    # if the node is part of more than one way
+    if length(way_ids) > 1
+        return true
+    # if the node is the end of a street (has only one neighbour)
+    elseif is_end_node(g.graph, index)
+        return true
+    # if the node appears more than once in the nodes of a way
+    # (excluding duplicates caused by circularity)
+    else
+        way = g.ways[first(way_ids)]  # if there is more than one way, the first if would trigger
+        if is_circular_way(way)
+            ocurrences = count(==(osm_id), way.nodes[1:end-1])
+        else
+            ocurrences = count(==(osm_id), way.nodes)                    
+        end
+        ocurrences > 1 && (return true)
+    end
+    return false
+end
+
+
+"""
     shadow_graph_from_light_osm_graph(g)
 
 transforms a `LightOSM.OSMGraph` into a `MetaDiGraph`, containing only the topologically relevant
@@ -478,14 +556,13 @@ in the case of non helper edges:
 """
 function shadow_graph_from_light_osm_graph(g)
     # make the streets nodes are a part contain only unique elements
-    g.node_to_way = Dict(key => collect(Set(value)) for (key, value) in g.node_to_way)
+    g.node_to_way = Dict(key => unique(value) for (key, value) in g.node_to_way)
     # build clean graph containing only nodes for topologically relevant nodes
     g_nav = MetaDiGraph()
 
-    # add only those nodes, which are part of two or more ways or ends of streets
-    for (osm_id, ways) in g.node_to_way
-        index = g.node_to_index[osm_id]
-        if length(ways) > 1 || is_end_node(g.graph, index) || is_lolipop_node(g, osm_id)
+    # add only those nodes, which are part of two or more ways
+    for (osm_id, way_ids) in g.node_to_way
+        if add_this_node(g, osm_id)
             lat_point = g.nodes[osm_id].location.lat
             lon_point = g.nodes[osm_id].location.lon
             point = ArchGDAL.createpoint(lon_point, lat_point)
