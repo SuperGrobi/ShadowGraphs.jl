@@ -9,6 +9,7 @@ using ProgressMeter
 using ArchGDAL
 using Statistics
 using DataFrames
+using StatsBase
 using CSV
 
 export shadow_graph_from_object, shadow_graph_from_file, shadow_graph_from_download
