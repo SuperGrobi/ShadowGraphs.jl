@@ -1,230 +1,4 @@
 """
-    is_end_node(g, index)
-
-checks if node `index` in graph `g` represents the end of a street (that is, has as most one neighbour).
-"""
-function is_end_node(g, index)
-    from = inneighbors(g, index)
-    to = outneighbors(g, index)
-    if length(from) == 1 && length(to) == 0
-        return true
-    elseif length(to) == 1 && length(from) == 0
-        return true
-    elseif length(to) == 1 && length(from) == 1
-        return first(to) == first(from)
-    else
-        return false
-    end
-end
-
-"""
-    point_on_radius(x, y, r)
-
-returns `x` and `y` coordinates of two random points on a circle with radius `r` around a point given by `x` and `y`.
-The two points have a fixed angluar offset of π/3 around the center.
-(This function assumes kartesian coordinates and euclidean distances. It is used to gernerate locations of helper nodes).
-"""
-function point_on_radius(x, y, r)
-    ϕ = rand() * 2π
-    dx = r * cos.([ϕ, ϕ+π/3])
-    dy = r * sin.([ϕ, ϕ+π/3])
-    return x.+dx, y.+dy
-end
-
-"""
-    offset_point_between(g, s, d)
-
-returns `x` and `y` coordinates of a point between nodes `s` and `d` in graph `g`, using the `:lon` and `:lat` properties of the nodes.
-the point is (approximately) centered between `s` and `p`, and offset from the centerline by a random distance. 
-(Use this function only to generate visually offset point, whose location is not relevant for anything except plotting).
-"""
-function offset_point_between(g, s, d)
-    lat_start = get_prop(g, s, :lat)
-    lon_start = get_prop(g, s, :lon)
-    lat_dest = get_prop(g, d, :lat)
-    lon_dest = get_prop(g, d, :lon)
-    delta_lat = (lat_dest-lat_start)
-    delta_lon = (lon_dest-lon_start)
-    lat_center = (lat_start + lat_dest) / 2
-    lon_center = (lon_start + lon_dest) / 2
-    scale = 0.5 * rand() + 0.1
-    lat_new = lat_center + scale * delta_lon
-    lon_new = lon_center - scale * delta_lat
-    return lon_new, lat_new
-end
-
-"""
-    add_edge_with_data!(g, s, d; data=Dict())
-
-adds new edge from `s` to `d` to `g::MetaDiGraph`, and populates it with the `props` given in `data`.
-
-Special care is given to self and multi edges:
-- self edges: if `s==d`, actually two new vertices with `props` of `:lat`, `:lon`, `pointgeom` and `:helper=true` are added.
-these new vertices (`h1` and `h2`) are then connected to form a loop like: `s --he1--> h1 --real_edge--> h2 --he2--> d`,
-where `he1` and `he2` are helper edges with only one `prop` of `:helper=true`. `real_edge` is carrying all the `props` defined
-in `data`
-- multi edges: if `Edge(s,d) ∈ Edges(g)`, we add one new helper vertex with `props` of `:lat`, `:lon`, `pointgeom` and `:helper=true`.
-We connect to the graph like this: `s --he--> h --real_edge--> d`, where `he` is a helper edge with only one `prop`, `:helper=true`.
-`real_edge` carries all the `props` specified in `data`
-
-This process is nessecary to preserve the street network topology, since `MetaDiGraph`s do not support multi edges (and therefore also no multi self edges).
-"""
-function add_edge_with_data!(g, s, d; data=Dict())
-    if s == d  # if we are about to add a self-loop
-        #@warn "trying to add self loop for node $(get_prop(g, s, :osm_id)) ($s)"
-        geomlength = ArchGDAL.geomlength(data[:edgegeom])
-
-        p1 = ArchGDAL.pointalongline(data[:edgegeom], 0.1 * geomlength)
-        apply_wsg_84!(p1)
-        add_vertex!(g, Dict(:lon=>ArchGDAL.getx(p1, 0), :lat=>ArchGDAL.gety(p1, 0), :pointgeom=>p1, :helper=>true))
-        id_1 =nv(g)
-        add_edge!(g, s, id_1, :helper, true)
-        
-        p2 = ArchGDAL.pointalongline(data[:edgegeom], 0.6 * geomlength)
-        apply_wsg_84!(p2)
-        add_vertex!(g, Dict(:lon=>ArchGDAL.getx(p2, 0), :lat=>ArchGDAL.gety(p2, 0), :pointgeom=>p2, :helper=>true))
-        id_2 = nv(g)
-        add_edge!(g, id_2, d, :helper, true)
-
-        add_edge_with_data!(g, id_1, id_2; data=data)
-    elseif has_edge(g, s, d)
-            #@warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
-            # all of this is bad...
-            p = ArchGDAL.pointalongline(data[:edgegeom], 0.5 * ArchGDAL.geomlength(data[:edgegeom]))
-            apply_wsg_84!(p)
-            add_vertex!(g, Dict(:lon=>ArchGDAL.getx(p, 0), :lat=>ArchGDAL.gety(p, 0), :pointgeom=>p, :helper=>true))
-            add_edge!(g, s, nv(g), :helper, true)
-            add_edge_with_data!(g, nv(g), d; data=data)
-    else
-        for i in [s, d]  # throw consistent errors TODO: fix this.
-            get_prop(g, i, :lon)
-            get_prop(g, i, :lat)
-        end
-        add_edge!(g, s, d)
-        for (key, value) in data
-            set_prop!(g, s, d, key, value)
-        end
-    end
-end
-
-"""
-    is_circular_way(way::Way)
-
-checks if a `LightOSM.Way` way starts at the same node it ends.
-"""
-is_circular_way(way::Way) = way.nodes[1] == way.nodes[end]
-
-"""
-    countall(numbers)
-
-counts how often every number appears in numbers. Returns dict with `number=>count`
-"""
-countall(numbers) = Dict(number=>count(==(number), numbers) for number in unique(numbers))
-
-"""
-
-    decompose_way_to_primitives(way::Way)
-
-Decomposed a `way` with possible self-intersections/loops into multiple ways which are guaranteed to be either
-- non-intersecting lines, where every node in the way is unique, or
-- circular ways, where only the first and last node in the way are not unique.
-
-# example
-a simple `way` with nodes `[10,20,30,40,50,30]` (which looks like a triangle on a stick, not the repeated `30`) will
-be decomposed into two ways, with the nodes `[10,20,30]` and `[30,40,50,30]`.
-"""
-function decompose_way_to_primitives(way::Way)
-    length(way.nodes) <= 1 && throw(ArgumentError("there are less than two nodes in way $(way.id)"))
-    nodecounts = countall(way.nodes)
-    duplicate_nodes = filter(x->x.second > 1, nodecounts)
-    cut_locations = findall(n->n ∈ keys(duplicate_nodes), way.nodes)
-
-    # if nowhere to cut (straight line) or if ring without intersection
-    if length(cut_locations) == 0 || cut_locations == [1, length(way.nodes)]
-        return [way]
-    end
-
-    # from here on, cut_locations is at least one element long
-    if cut_locations[1] != 1
-        cut_locations = [1; cut_locations]
-    end
-    if cut_locations[end] != length(way.nodes)
-        push!(cut_locations, length(way.nodes))
-    end
-    # from here, there are at least three cut locations, including start and end point
-    sub_nodes = [way.nodes[s:d] for (s, d) in zip(cut_locations[1:end-1], cut_locations[2:end])]
-    if is_circular_way(way)
-        sub_nodes = [sub_nodes[2:end-1]; [[sub_nodes[end]; sub_nodes[1][2:end]]]]
-    end
-    return [Way(way.id, nodes, way.tags) for nodes in sub_nodes]
-end
-
-"""
-    geolinestring(nodes, node_id_list)
-
-creates an `ArchGDAL linestring` from a dictionary mapping osm node ids to `LightOSM.Node` and a list of osm node ids,
-representing the nodes of the linestring in order.
-"""
-function geolinestring(nodes, node_id_list)
-    nodelist = [nodes[id] for id in node_id_list]
-    location_tuples = [(node.location.lon, node.location.lat) for node in nodelist]
-    linestring = ArchGDAL.createlinestring(location_tuples)
-    apply_wsg_84!(linestring)
-    return linestring
-end
-
-"""
-    get_rotational_direction(light_osm_graph)
-
-calculates the dominant rotational direction of circular ways in `light_osm_graph`. This can be used to infere
-the side of the road on which people in a street network drive.
-
-returns `-1` if the rotation is lefthanded, `1` else. (prints warning if no clear direction could be established).
-"""
-function get_rotational_direction(light_osm_graph)
-    nodes = light_osm_graph.nodes
-    ways = light_osm_graph.ways
-
-    rot_dir = 0
-    for way in values(ways)
-        !is_circular_way(way) && continue  # skip non rings
-        node_ids = way.nodes
-        points = [nodes[node_id].location for node_id in node_ids[1:end-1]]
-        x = [i.lon for i in points]
-        y = [i.lat for i in points]
-        min_x_ind = findall(e->e==minimum(x), x)
-
-        min_y_options = y[min_x_ind]
-        y_ind = argmin(min_y_options)
-        ind = min_x_ind[y_ind]
-
-        x_b = x[ind]
-        y_b = y[ind]
-        ind_low = mod1(ind-1, length(points))
-        x_a = x[ind_low]
-        y_a = y[ind_low]
-        ind_high = mod1(ind+1, length(points))
-        x_c = x[ind_high]
-        y_c = y[ind_high]
-
-        det = (x_b-x_a)*(y_c - y_a) - (x_c - x_a)*(y_b-y_a)
-        if det > 0
-            rot_dir += 1
-        elseif det < 0
-            rot_dir -= 1
-        end
-    end
-    rot_dir == 0 && @warn "not rotational direction could be found. choosing right hand side driving."
-    if rot_dir >= 0
-        @info "right hand side driving selected"
-        return 1
-    else
-        @info "left hand side driving selected"
-        return -1
-    end
-end
-
-"""
     width(tags)
 
 less opinionated version of the basic parsing `LightOSM` does, to parse the `width` tag of an osm way.
@@ -238,6 +12,7 @@ function width(tags)
         return missing
     end
 end
+
 
 """
     parse_lanes(tags::AbstractDict, tagname)
@@ -265,6 +40,7 @@ function parse_lanes(tags::AbstractDict, tagname)
         return missing
     end
 end
+
 
 """
     parse_raw_ways(raw_ways, network_type)
@@ -319,6 +95,197 @@ end
 
 
 """
+    is_end_node(g, index)
+
+checks if node `index` in graph `g` represents the end of a street (that is, has as most one neighbour).
+"""
+function is_end_node(g, index)
+    from = inneighbors(g, index)
+    to = outneighbors(g, index)
+    if length(from) == 1 && length(to) == 0
+        return true
+    elseif length(to) == 1 && length(from) == 0
+        return true
+    elseif length(to) == 1 && length(from) == 1
+        return first(to) == first(from)
+    else
+        return false
+    end
+end
+
+
+"""
+    add_edge_with_data!(g, s, d; data=Dict())
+
+adds new edge from `s` to `d` to `g::MetaDiGraph`, and populates it with the `props` given in `data`.
+
+`data` is expected to have at least a key `:edgegeom`, containing the geometry of the street between `s` and `d` as an `ArchGDAL linestring` in the WSG84
+system. (Use `apply_wsg_84!`)
+
+Special care is given to self and multi edges:
+- self edges: if `s==d`, actually two new vertices are added at 10% and 60% along the `:edgegeom`, with `props` of `:lat`, `:lon`, `pointgeom` and `:helper=true` set acordingly.
+These new vertices (`h1` and `h2`) are then connected to form a loop like: `s --he1--> h1 --real_edge--> h2 --he2--> d`,
+where `he1` and `he2` are helper edges with only one `prop` of `:helper=true`. `real_edge` is carrying all the `props` defined
+in `data`
+- multi edges: if `Edge(s,d) ∈ Edges(g)`, we add one new helper vertex at 50% along the `:edgegeom` with `props` of `:lat`, `:lon`, `pointgeom` and `:helper=true`.
+We connect to the graph like this: `s --he--> h --real_edge--> d`, where `he` is a helper edge with only one `prop`, `:helper=true`.
+`real_edge` carries all the `props` specified in `data`
+
+This process is nessecary to preserve the street network topology, since `MetaDiGraph`s do not support multi edges (and therefore also no multi self edges).
+"""
+function add_edge_with_data!(g, s, d; data=Dict())
+    !haskey(data, :edgegeom) && throw(KeyError("cant add edge, data has no key :edgegeom."))
+
+    if s == d  # if we are about to add a self-loop
+        #@warn "trying to add self loop for node $(get_prop(g, s, :osm_id)) ($s)"
+        geomlength = ArchGDAL.geomlength(data[:edgegeom])
+
+        p1 = ArchGDAL.pointalongline(data[:edgegeom], 0.1 * geomlength)
+        apply_wsg_84!(p1)
+        add_vertex!(g, Dict(:lon=>ArchGDAL.getx(p1, 0), :lat=>ArchGDAL.gety(p1, 0), :pointgeom=>p1, :helper=>true))
+
+        id_1 =nv(g)
+        add_edge!(g, s, id_1, :helper, true)
+        
+        p2 = ArchGDAL.pointalongline(data[:edgegeom], 0.6 * geomlength)
+        apply_wsg_84!(p2)
+        add_vertex!(g, Dict(:lon=>ArchGDAL.getx(p2, 0), :lat=>ArchGDAL.gety(p2, 0), :pointgeom=>p2, :helper=>true))
+        id_2 = nv(g)
+        add_edge!(g, id_2, d, :helper, true)
+
+        add_edge_with_data!(g, id_1, id_2; data=data)
+    elseif has_edge(g, s, d)
+            #@warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
+            # all of this is bad...
+            p = ArchGDAL.pointalongline(data[:edgegeom], 0.5 * ArchGDAL.geomlength(data[:edgegeom]))
+            apply_wsg_84!(p)
+            add_vertex!(g, Dict(:lon=>ArchGDAL.getx(p, 0), :lat=>ArchGDAL.gety(p, 0), :pointgeom=>p, :helper=>true))
+            add_edge!(g, s, nv(g), :helper, true)
+            add_edge_with_data!(g, nv(g), d; data=data)
+    else
+        add_edge!(g, s, d)
+        for (key, value) in data
+            set_prop!(g, s, d, key, value)
+        end
+    end
+end
+
+
+"""
+    is_circular_way(way::Way)
+
+checks if a `LightOSM.Way` way starts at the same node it ends.
+"""
+is_circular_way(way::Way) = way.nodes[1] == way.nodes[end]
+
+
+"""
+    countall(numbers)
+
+counts how often every number appears in numbers. Returns dict with `number=>count`
+"""
+countall(numbers) = Dict(number=>count(==(number), numbers) for number in unique(numbers))
+
+
+"""
+
+    decompose_way_to_primitives(way::Way)
+
+Decomposed a `way` with possible self-intersections/loops into multiple ways which are guaranteed to be either
+- non-intersecting lines, where every node in the way is unique, or
+- circular ways, where only the first and last node in the way are not unique.
+
+# example
+a simple `way` with nodes `[10,20,30,40,50,30]` (which looks like a triangle on a stick, not the repeated `30`) will
+be decomposed into two ways, with the nodes `[10,20,30]` and `[30,40,50,30]`.
+"""
+function decompose_way_to_primitives(way::Way)
+    length(way.nodes) <= 1 && throw(ArgumentError("there are less than two nodes in way $(way.id)"))
+    nodecounts = countall(way.nodes)
+    duplicate_nodes = filter(x->x.second > 1, nodecounts)
+    cut_locations = findall(n->n ∈ keys(duplicate_nodes), way.nodes)
+
+    # if nowhere to cut (straight line) or if ring without intersection
+    if length(cut_locations) == 0 || cut_locations == [1, length(way.nodes)]
+        return [way]
+    end
+
+    # from here on, cut_locations is at least one element long
+    if cut_locations[1] != 1
+        cut_locations = [1; cut_locations]
+    end
+    if cut_locations[end] != length(way.nodes)
+        push!(cut_locations, length(way.nodes))
+    end
+    # from here, there are at least three cut locations, including start and end point
+    sub_nodes = [way.nodes[s:d] for (s, d) in zip(cut_locations[1:end-1], cut_locations[2:end])]
+    if is_circular_way(way)
+        sub_nodes = [sub_nodes[2:end-1]; [[sub_nodes[end]; sub_nodes[1][2:end]]]]
+    end
+    return [Way(way.id, nodes, way.tags) for nodes in sub_nodes]
+end
+
+
+"""
+    geolinestring(nodes, node_id_list)
+
+creates an `ArchGDAL linestring` from a dictionary mapping osm node ids to `LightOSM.Node` and a list of osm node ids,
+representing the nodes of the linestring in order.
+"""
+function geolinestring(nodes, node_id_list)
+    nodelist = [nodes[id] for id in node_id_list]
+    location_tuples = [(node.location.lon, node.location.lat) for node in nodelist]
+    linestring = ArchGDAL.createlinestring(location_tuples)
+    apply_wsg_84!(linestring)
+    return linestring
+end
+
+
+"""
+
+    get_rotational_direction(way::Way, nodes, direction)
+
+calculates the direction of rotation of the way if walked through in the direction of `direction` (either 1 or -1).
+Since the node locations are stored seperately, you have to pass in a dict `node_id=>LightOSM.Node` seperately. Used only on simplified ways.
+
+# Returns
+- `1` if the rotation is righthanded
+- `-1` if the rotation is lefthanded
+- `0` if the way is not closed
+"""
+function get_rotational_direction(way::Way, nodes, direction)
+    !is_circular_way(way) && return 0  # non rings do not rotate
+    node_ids = way.nodes
+    points = [nodes[node_id].location for node_id in node_ids[1:end-1]]
+    x = [i.lon for i in points]
+    y = [i.lat for i in points]
+    min_x_ind = findall(e->e==minimum(x), x)
+
+    min_y_options = y[min_x_ind]
+    y_ind = argmin(min_y_options)
+    ind = min_x_ind[y_ind]
+
+    x_b = x[ind]
+    y_b = y[ind]
+    ind_low = mod1(ind-1, length(points))
+    x_a = x[ind_low]
+    y_a = y[ind_low]
+    ind_high = mod1(ind+1, length(points))
+    x_c = x[ind_high]
+    y_c = y[ind_high]
+
+    det = (x_b-x_a)*(y_c - y_a) - (x_c - x_a)*(y_b-y_a)
+    if det > 0
+        return 1 * direction
+    elseif det < 0
+        return -1 * direction
+    else
+        return 0
+    end
+end
+
+
+"""
 
     add_this_node(g, osm_id)
 
@@ -353,35 +320,63 @@ end
 
 """
 
-    get_node_list(way, start_osm_id, topological_nodes, direction) 
+    get_node_list(simple_way, start_osm_id, topological_nodes, direction) 
 
-tries to get list of osm ids in way between the start_osm_id and the next topologically relevant node in direction of `direction`.
-Returns either `Int[]` or `nothing` if there is no relevant node in direction of `direction`
+tries to get list of osm ids in `simple_way` between the start_osm_id and the next topologically relevant node in direction of `direction`.
+Returns either `Int[]` or `nothing` if there is no relevant node in direction of `direction`.
+
+Used only on simplified ways.
 """
-function get_node_list(way, start_osm_id, topological_nodes, direction)
-    # direction in -1, 1
-    #topo nodes in way.nodes
-    #start id in topo nodes and way.nodes
+function get_node_list(simple_way, start_osm_id, topological_nodes, direction)
+    direction ∉ [-1, 1] && throw(ArgumentError("direction $direction not allowed"))
 
-    all_nodes = way.nodes
+    all_nodes = simple_way.nodes
+
+    start_osm_id ∉ all_nodes && throw(ArgumentError("start_osm_id $start_osm_id not in way.nodes: $all_nodes"))
+    start_osm_id ∉ topological_nodes && throw(ArgumentError("start_osm_id $start_osm_id not in topological_nodes: $topological_nodes"))
+    any([n ∉ all_nodes for n in topological_nodes]) && throw(ArgumentError("not all topological nodes ($topological_nodes) are in the original way ($all_nodes)!"))
+
+    large_counts = filter(p->p.second > 1, countall(all_nodes))
+    length(large_counts) > 1 && throw(ArgumentError("You input a non simple way (nodes: $all_nodes)"))
+
+    if length(large_counts) == 1
+        prob_node = first(first(large_counts))
+        if !(prob_node == all_nodes[1] && prob_node == all_nodes[end])
+            throw(ArgumentError("You input a non simple, non cyclic way (nodes: $all_nodes)"))
+        end
+    end
+
+    # get index of start node in full and in reduced nodes list
+    all_start_index = direction == 1 ? findfirst(==(start_osm_id), all_nodes) : findlast(==(start_osm_id), all_nodes)
+    topological_start_index = direction == 1 ? findfirst(==(start_osm_id), topological_nodes) : findlast(==(start_osm_id), topological_nodes) 
+    topological_destination_index = topological_start_index+direction
+
     # in every simple way, at most the the start and end node are the same
     if is_circular_way(simple_way) # start and end node are the same
-                    
+        destination_osm_id = topological_nodes[mod1(topological_destination_index, length(topological_nodes))]
+        all_destination_index = direction == -1 ? findfirst(==(destination_osm_id), all_nodes) : findlast(==(destination_osm_id), all_nodes)
+        # correct destination due to periodic boundary
+        if direction == 1 && all_start_index > all_destination_index
+            all_destination_index += length(all_nodes)
+        elseif direction == -1 && all_start_index < all_destination_index
+            all_start_index += length(all_nodes)
+        end
+        indices = mod1.(all_start_index:direction:all_destination_index, length(all_nodes))
+
+        nodelist_inbetween = all_nodes[mod1.(all_start_index:direction:all_destination_index, length(all_nodes))]
+        return rle(nodelist_inbetween)[1]
     else # everything is unique, nothing is periodic
-
-        # get index of start node in full and in reduced nodes list
-        all_start_index = findfirst(==(start_osm_id), all_nodes)
-        topological_start_index = findfirst(==(start_osm_id), topological_nodes)
-
         try
-            destination_osm_id = topological_nodes[start_index+step]
+            destination_osm_id = topological_nodes[topological_start_index+direction]
             all_destination_index = findfirst(==(destination_osm_id), all_nodes)
-            nodelist_inbetween = all_nodes[all_start_index:step:all_destination_index]
+            nodelist_inbetween = all_nodes[all_start_index:direction:all_destination_index]
+            return nodelist_inbetween
         catch e
-            e isa BoundsError ? continue : rethrow(e)
-        end 
+            e isa BoundsError ? (return nothing) : rethrow(e)
+        end
     end
 end
+
 
 """
     shadow_graph_from_light_osm_graph(g)
@@ -441,7 +436,8 @@ function shadow_graph_from_light_osm_graph(g)
 
     osm_id_to_nav_id = Dict(get_prop(g_nav, i, :osm_id)=>i for i in vertices(g_nav))
     osm_ids = collect(keys(osm_id_to_nav_id))
-    #@showprogress 0.5 "rebuilding topology"
+
+    rot_dir = 0
     for start_node_id in vertices(g_nav)
         # get ways this node is part of
         start_osm_id = get_prop(g_nav, start_node_id, :osm_id)
@@ -461,7 +457,9 @@ function shadow_graph_from_light_osm_graph(g)
                 topological_nodes = [node for node in all_nodes if node in osm_ids]
 
                 for step in step_directions
-                    nodelist_start_destination = get_node_list(way, start_osm_id, topological_nodes, step)
+                    rot_dir += get_rotational_direction(simple_way, g.nodes, step)
+
+                    nodelist_start_destination = get_node_list(simple_way, start_osm_id, topological_nodes, step)
                     nodelist_start_destination === nothing && continue
                     linestring = geolinestring(g.nodes, nodelist_start_destination) 
                     data = Dict(
@@ -476,10 +474,19 @@ function shadow_graph_from_light_osm_graph(g)
                 end
             end
         end
-    end    
+    end
+
+    rot_dir == 0 && @warn "not rotational direction could be found. choosing right hand side driving."
+    if rot_dir >= 0
+        @info "right hand side driving selected"
+        rot_dir = 1
+    else
+        @info "left hand side driving selected"
+        rot_dir = -1
+    end
+
     set_prop!(g_nav, :crs, OSM_ref[])
-    offset_dir = get_rotational_direction(g)
-    set_prop!(g_nav, :offset_dir, offset_dir)
+    set_prop!(g_nav, :offset_dir, rot_dir)
     return g_nav
 end
 

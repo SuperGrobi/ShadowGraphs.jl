@@ -3,6 +3,8 @@ using LightOSM
 using Folium
 using Graphs
 using MetaGraphs
+using ArchGDAL
+using CoolWalksUtils
 using Test
 
 @testset "Circularity weirdness" begin
