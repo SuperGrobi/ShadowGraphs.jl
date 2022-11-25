@@ -229,7 +229,17 @@ stresstest_open = Way(5, [10, 20, 30, 40, 50, 60, 70, 50, 30, 80, 90], Dict("one
 stresstest_closed = Way(6, [10, 20, 30, 40, 20, 50, 60, 60, 70, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
 ShadowGraphs.decompose_way_to_primitives(ring)
 
-g_osm = graph_from_file("./test/data/test_clifton_bike.json"; network_type=:bike)
+g_osm = graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)
+g = shadow_graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)
+
+begin
+    fig = draw(g, :vertices; figure_params=Dict(:location=>(52.904, -1.18), :zoom_start=>14))
+    draw!(fig, g, :edges)
+    draw!(fig, g, :edgegeom)
+end
+
+g_osm.graph
+
 
 g_osm.node_to_way
 

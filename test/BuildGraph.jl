@@ -22,9 +22,105 @@ end
 
 
 @testset "ShadowGraph creation" begin
-    @test "width"
-    @test "parse_lanes"
-    @test "parse_raw_ways"
+    @testset "width" begin
+        @test ShadowGraphs.width(Dict(:a=>2)) isa Missing
+        @test ShadowGraphs.width(Dict(:a=>2, "width"=>missing)) isa Missing
+        @test ShadowGraphs.width(Dict(:a=>2, "width"=>4)) == 4
+        @test ShadowGraphs.width(Dict(:a=>2, "width"=>4.6)) == 4.6
+        @test ShadowGraphs.width(Dict("width"=> -4)) == 4
+
+        @test ShadowGraphs.width(Dict("width"=>"5")) == 5
+        @test ShadowGraphs.width(Dict("width"=>"8.53")) == 8.53
+        @test ShadowGraphs.width(Dict("width"=>"2, 3, 5.9m, 8")) == 8
+        @test ShadowGraphs.width(Dict("width"=>"6.5meter")) == 6.5
+        @test ShadowGraphs.width(Dict("width"=>"-6.5 meter, 8m")) == 8
+        @test ShadowGraphs.width(Dict("width"=>"-6.5meter, -8m")) == 8
+    end
+
+    @testset "parse_lanes" begin
+       tags = Dict(
+        "lanes" => 4.6,
+        "lanes:forward" => 3,
+        "lanes:backward" => "4.6",
+        "lanes:both_ways" => "3",
+        "lanes:missing" => missing
+       )
+       @test ShadowGraphs.parse_lanes(tags, "lanes") == LightOSM.DEFAULT_OSM_LANES_TYPE(5)
+       @test ShadowGraphs.parse_lanes(tags, "lanes:forward") == LightOSM.DEFAULT_OSM_LANES_TYPE(3)
+       @test ShadowGraphs.parse_lanes(tags, "lanes:backward") == LightOSM.DEFAULT_OSM_LANES_TYPE(5)
+       @test ShadowGraphs.parse_lanes(tags, "lanes:both_ways") == LightOSM.DEFAULT_OSM_LANES_TYPE(3)
+       @test ShadowGraphs.parse_lanes(tags, "lanes:non_mapped") isa Missing
+       @test ShadowGraphs.parse_lanes(tags, "lanes:missing") isa Missing
+
+       tags = Dict(
+        "lanes" => -4.6,
+        "lanes:forward" => -3,
+        "lanes:backward" => "-4.6",
+        "lanes:both_ways" => "-3",
+        "lanes:missing" => missing
+       )
+       @test ShadowGraphs.parse_lanes(tags, "lanes") == LightOSM.DEFAULT_OSM_LANES_TYPE(5)
+       @test ShadowGraphs.parse_lanes(tags, "lanes:forward") == LightOSM.DEFAULT_OSM_LANES_TYPE(3)
+       @test ShadowGraphs.parse_lanes(tags, "lanes:backward") == LightOSM.DEFAULT_OSM_LANES_TYPE(5)
+       @test ShadowGraphs.parse_lanes(tags, "lanes:both_ways") == LightOSM.DEFAULT_OSM_LANES_TYPE(3)
+       @test ShadowGraphs.parse_lanes(tags, "lanes:non_mapped") isa Missing
+       @test ShadowGraphs.parse_lanes(tags, "lanes:missing") isa Missing
+
+       tags = Dict(
+        "lanes" => "5 lanes",
+        "lanes:forward" => "-5.2lanes",
+        "lanes:backward" => "5,6,2.9, 8",
+        "lanes:both_ways" => "[1,2,3,4,-12.5]",
+       ) 
+       @test ShadowGraphs.parse_lanes(tags, "lanes") == LightOSM.DEFAULT_OSM_LANES_TYPE(5)
+       @test ShadowGraphs.parse_lanes(tags, "lanes:forward") == LightOSM.DEFAULT_OSM_LANES_TYPE(5)
+       @test ShadowGraphs.parse_lanes(tags, "lanes:backward") == LightOSM.DEFAULT_OSM_LANES_TYPE(round((5+6+2.9+8)/4))
+       @test ShadowGraphs.parse_lanes(tags, "lanes:both_ways") == LightOSM.DEFAULT_OSM_LANES_TYPE(round((10+12.5)/5))
+    end
+
+    @testset "parse_raw_ways" begin
+        raw_ways = [
+            Dict(  # gets skipped because it is not a highway
+                "id"=>1,
+                "nodes"=>[1,2,3,4,5],
+                "tags"=>Dict{String,Any}("nodes"=>[1,2,3], "lanes"=>"4")
+            ),
+            Dict(  # gets skipped due to network mismatch
+                "id"=>2,
+                "nodes"=>[1,2,3,4,5],
+                "tags"=>Dict{String,Any}("highway"=>"raceway", "lanes"=>"6")
+            ),
+            Dict(
+                "id"=>3,
+                "nodes"=>[1,2,3,4,5],
+                "tags"=>Dict{String,Any}("highway"=>"residential", "oneway"=>"1", "width"=>"10m", "lanes"=>"2")
+            ),
+            Dict(
+                "id"=>4,
+                "nodes"=>[1,2,3,4,5],
+                "tags"=>Dict{String,Any}("highway"=>"path", "oneway"=>"no", "lanes"=>"4", "lanes:forward"=>3, "lanes:backward"=>"1")
+            )
+        ]
+
+        parsed = ShadowGraphs.parse_raw_ways(raw_ways, :bike)
+
+        @test length(parsed) == 2
+        @test parsed[3].tags["oneway"] == true
+        @test parsed[3].tags["reverseway"] == false
+        @test parsed[3].tags["width"] == 10
+        @test parsed[3].tags["lanes"] == 2
+        @test parsed[3].tags["lanes:forward"] isa Missing
+        @test parsed[3].tags["lanes:backward"] isa Missing
+        @test parsed[3].tags["lanes:both_ways"] isa Missing
+
+        @test parsed[4].tags["oneway"] == false
+        @test parsed[4].tags["reverseway"] == false
+        @test parsed[4].tags["width"] isa Missing
+        @test parsed[4].tags["lanes"] == 4
+        @test parsed[4].tags["lanes:forward"] == 3
+        @test parsed[4].tags["lanes:backward"] == 1
+        @test parsed[4].tags["lanes:both_ways"] isa Missing
+    end
 
     @testset "is_end_node" begin
         g = setup_testgraph()
@@ -314,11 +410,40 @@ end
     end
 
     @testset "shadow_graph_from_light_osm_graph" begin
-        @test false
+        g_osm = graph_from_file("./data/test_clifton_bike.json", network_type=:bike)
+        g = ShadowGraphs.shadow_graph_from_light_osm_graph(g_osm)
+        @test g isa MetaDiGraph
+        @test nv(g) == 1692
+        @test ne(g) == 3758
     end
 
-    @test "get_raw_ways"
-    @test "shadow_graph_from_object"
-    @test "shadow_graph_from_file"
-    @test "shadow_graph_from_download"
+    @testset "shadow_graph_from_object" begin
+        obj = LightOSM.file_deserializer("./data/test_clifton_bike.json")("./data/test_clifton_bike.json")
+        g = shadow_graph_from_object(obj, network_type=:bike)
+        @test g isa MetaDiGraph
+        @test nv(g) == 1692
+        @test ne(g) == 3758
+    end
+
+    @testset "shadow_graph_from_file" begin
+        g = shadow_graph_from_file("./data/test_clifton_bike.json", network_type=:bike)
+        @test g isa MetaDiGraph
+        @test nv(g) == 1692
+        @test ne(g) == 3758 
+    end
+
+    @testset "shadow_graph_from_download" begin
+        for i in 10:-1:1
+            try
+                g = shadow_graph_from_download(:bbox; minlat=52.89, minlon=-1.2, maxlat=52.92, maxlon=-1.165, network_type=:bike)
+                @test g isa MetaDiGraph
+                # very weak test, but that is about as much as I can guarantee.
+                @test nv(g) > 0
+                @test ne(g) > 0
+                break
+            catch e
+                e isa ErrorException && println("download failed, retrying $i times.")
+            end
+        end
+    end
 end
