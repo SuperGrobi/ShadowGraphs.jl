@@ -463,7 +463,7 @@ function shadow_graph_from_light_osm_graph(g)
                     nodelist_start_destination === nothing && continue
                     linestring = geolinestring(g.nodes, nodelist_start_destination) 
                     data = Dict(
-                        :(osm_id) => simple_way.id,
+                        :osm_id => simple_way.id,
                         :tags => simple_way.tags,
                         :edgegeom => linestring,
                         :geomlength => 0,
