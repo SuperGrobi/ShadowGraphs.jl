@@ -7,6 +7,7 @@ draws the given data series properies of the graph into a `Folium.jl` map.
 - fig::FoliumMap: map to draw in
 - g: shadow graph carying the data
 - series_type: type of data to draw from the graph. Pick from: `:vertices`, `:edges`, `:edgegeom`, `:shadowgeom`.
+- draw_arrows: if there should be a circle drawn 80% along the edgegeom. (only applies when `series_type` is `:edgegeom`)
 - kwargs: keywords passed to folium for every `series_type`. (see the [python docs](https://python-visualization.github.io/folium/) and the [leaflet docs](https://leafletjs.com/reference.html) for a full list of all options.) 
 
 Every `series_type` has a few sensible defaults set,
@@ -17,7 +18,8 @@ element arguments.
 # returns
 - fig::FoliumMap (passthrough of argument)
 """
-function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; kwargs...) where {T<:AbstractMetaGraph}
+function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; draw_arrows=true, kwargs...) where {T<:AbstractMetaGraph}
+    @nospecialize
     kw = Dict{Symbol, Any}(kwargs)
     if series_type === :vertices
         kw[:radius] = get(kw, :radius, 2)
@@ -48,6 +50,7 @@ function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; kwargs...) wher
             tt = "osm id: $id<br>shadow length: $(round(shadowed_length; digits=2))<br>total length: $(round(full_length; digits=2))<br>fraction in shadow: $(round(shadowed_length/full_length; digits=2))"
             linestring = get_prop(g, edge, :edgegeom)
             draw!(fig, linestring; tooltip=tt, popup=tt, kw...)
+            draw_arrows && draw!(fig, ArchGDAL.pointalongline(linestring, 0.8 * ArchGDAL.geomlength(linestring)); fill=true, fill_opacity=1, radius=1.0, kw...)
         end
     elseif series_type === :shadowgeom
         kw[:color] = get(kw, :color, "black")
