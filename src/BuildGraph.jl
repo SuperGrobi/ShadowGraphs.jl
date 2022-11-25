@@ -2,12 +2,15 @@
     width(tags)
 
 less opinionated version of the basic parsing `LightOSM` does, to parse the `width` tag of an osm way.
-Returns the parsed width if the tag exists or `missing` if not.
+Returns the parsed width if the tag exists or `missing` if not.If Values are negative, we take the absolute value.
 """
 function width(tags)
     width = get(tags, "width", missing)
     if width !== missing
-        return width isa String ? max([LightOSM.remove_non_numeric(h) for h in split(width, r"[+^;,-]")]...) : width
+        if !(width isa Number)
+            width = max([LightOSM.remove_non_numeric(h) for h in split(width, r"[+^;,-]")]...)
+        end
+            return abs(width)
     else
         return missing
     end
@@ -26,13 +29,13 @@ function parse_lanes(tags::AbstractDict, tagname)
 
     if lanes_value !== missing
         if lanes_value isa Integer
-            return lanes_value
+            return abs(lanes_value)
         elseif lanes_value isa AbstractFloat
-            return U(round(lanes_value))
+            return U(abs(round(lanes_value)))
         elseif lanes_value isa String 
-            lanes_value = split(lanes_value, LightOSM.COMMON_OSM_STRING_DELIMITERS)
+            lanes_value = split(filter(!=('-'), lanes_value), LightOSM.COMMON_OSM_STRING_DELIMITERS)
             lanes_value = [LightOSM.remove_non_numeric(l) for l in lanes_value]
-            return U(round(mean(lanes_value)))
+            return U(abs(round(mean(lanes_value))))
         else
             throw(ErrorException("$tagname is neither a string nor number, check data quality: $lanes_value"))
         end
@@ -470,7 +473,7 @@ function shadow_graph_from_light_osm_graph(g)
                         :parsing_direction => step,
                         :helper => false
                     )
-                    add_edge_with_data!(g_nav, start_node_id, nodelist_start_destination[end]; data=data)
+                    add_edge_with_data!(g_nav, start_node_id, osm_id_to_nav_id[nodelist_start_destination[end]]; data=data)
                 end
             end
         end
