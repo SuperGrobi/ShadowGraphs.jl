@@ -10,3 +10,4 @@ using Test
 include("BuildGraph.jl")
 include("Persistence.jl")
 include("Plotting.jl")
+include("Projection.jl")
