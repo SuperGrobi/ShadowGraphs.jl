@@ -18,7 +18,8 @@ makedocs(;
         "Home" => "index.md",
         "Graph creation" => "BuildGraph.md",
         "IO" => "Persistence.md",
-        "Plotting" => "Plotting.md"
+        "Plotting" => "Plotting.md",
+        "Projection" => "Projection.md"
     ],
 )
 
