@@ -21,7 +21,7 @@ function Base.show(io::IO, ::MIME"juliavscode/html", map::FoliumDrawer)
     write(io, repr("text/html", map.x))
 end
 
-g_light, g_shadow = shadow_graph_from_file("../../data/nottingham/clifton/test_clifton_bike.json"; network_type=:bike);
+g_shadow = shadow_graph_from_file("../../data/nottingham/clifton/test_clifton_bike.json"; network_type=:bike);
 
 save_graph_to_csv("dir/test.csv", g_shadow)
 save_graph_to_csv("test.csv", g_shadow)
