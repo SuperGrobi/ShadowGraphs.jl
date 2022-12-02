@@ -406,12 +406,12 @@ in the case of helper edges:
 - `:helper=true`
 
 in the case of non helper edges:
-- :osm_id
-- :tags (tags of the original osm way, with parsed `width`, `lanes`, `lanes:forward`, `lanes:backward` and `lanes:both_ways`, `oneway` and `reverseway` keys)
-- :edgegeom (`ArchGDAL linestring` with the geometry of the edge)
-- :geomlength=0
-- :parsing_direction (direction in which we stepped through the original way nodes to get the linestring)
-- :helper=false 
+- `:osm_id`
+- `:tags` (tags of the original osm way, with parsed `width`, `lanes`, `lanes:forward`, `lanes:backward` and `lanes:both_ways`, `oneway` and `reverseway` keys)
+- `:edgegeom` (`ArchGDAL linestring` with the geometry of the edge)
+- `:full_length` (length of `edgegeom` in a projected crs)
+- `:parsing_direction` (direction in which we stepped through the original way nodes to get the linestring)
+- `:helper`=false 
 """
 function shadow_graph_from_light_osm_graph(g)
     # make the streets nodes are a part contain only unique elements
@@ -464,12 +464,19 @@ function shadow_graph_from_light_osm_graph(g)
 
                     nodelist_start_destination = get_node_list(simple_way, start_osm_id, topological_nodes, step)
                     nodelist_start_destination === nothing && continue
-                    linestring = geolinestring(g.nodes, nodelist_start_destination) 
+                    linestring = geolinestring(g.nodes, nodelist_start_destination)
+
+                    # project local to get length in meters
+                    p = ArchGDAL.pointalongline(linestring, 0.5 * ArchGDAL.geomlength(linestring))
+                    project_local!([linestring], ArchGDAL.getx(p, 0), ArchGDAL.gety(p, 0))
+                    projected_length = ArchGDAL.geomlength(linestring)
+                    project_back!([linestring])
+                    
                     data = Dict(
                         :osm_id => simple_way.id,
                         :tags => simple_way.tags,
                         :edgegeom => linestring,
-                        :geomlength => 0,
+                        :full_length => projected_length,
                         :parsing_direction => step,
                         :helper => false
                     )
