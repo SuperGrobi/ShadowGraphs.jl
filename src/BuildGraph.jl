@@ -359,9 +359,9 @@ function get_node_list(simple_way, start_osm_id, topological_nodes, direction)
         destination_osm_id = topological_nodes[mod1(topological_destination_index, length(topological_nodes))]
         all_destination_index = direction == -1 ? findfirst(==(destination_osm_id), all_nodes) : findlast(==(destination_osm_id), all_nodes)
         # correct destination due to periodic boundary
-        if direction == 1 && all_start_index > all_destination_index
+        if direction == 1 && all_start_index >= all_destination_index
             all_destination_index += length(all_nodes)
-        elseif direction == -1 && all_start_index < all_destination_index
+        elseif direction == -1 && all_start_index <= all_destination_index
             all_start_index += length(all_nodes)
         end
         indices = mod1.(all_start_index:direction:all_destination_index, length(all_nodes))

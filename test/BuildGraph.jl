@@ -380,6 +380,10 @@ end
         @test ShadowGraphs.get_node_list(ring, 10, topo_nodes_unbroken, 1) == [10,20,30,40,50,60,70,80,10]
         @test ShadowGraphs.get_node_list(ring, 10, topo_nodes_unbroken, -1) == [10,80,70,60,50,40,30,20,10]
 
+        topo_nodes_unbroken = [40]
+        @test ShadowGraphs.get_node_list(ring, 40, topo_nodes_unbroken, 1) == [40,50,60,70,80,10,20,30,40]
+        @test ShadowGraphs.get_node_list(ring, 40, topo_nodes_unbroken, -1) == [40,30,20,10,80,70,60,50,40]
+
         # start is part of topology
         topo_nodes_broken = [10,40,60,70,10]
         @test ShadowGraphs.get_node_list(ring, 10, topo_nodes_broken, 1) == [10,20,30,40]
@@ -399,6 +403,8 @@ end
         @test ShadowGraphs.get_node_list(ring, 20, topo_nodes_broken, -1) == [20,10,80]
         @test ShadowGraphs.get_node_list(ring, 60, topo_nodes_broken, -1) == [60,50]
         @test ShadowGraphs.get_node_list(ring, 80, topo_nodes_broken, -1) == [80,70,60]
+
+
 
         @test_throws ArgumentError ShadowGraphs.get_node_list(ring, 20, topo_nodes_broken, 2)  # direction not allowed
         @test_throws ArgumentError ShadowGraphs.get_node_list(ring, 25, topo_nodes_broken, 1)  # start not in way
