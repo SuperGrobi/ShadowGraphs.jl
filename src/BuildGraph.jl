@@ -359,9 +359,9 @@ function get_node_list(simple_way, start_osm_id, topological_nodes, direction)
         destination_osm_id = topological_nodes[mod1(topological_destination_index, length(topological_nodes))]
         all_destination_index = direction == -1 ? findfirst(==(destination_osm_id), all_nodes) : findlast(==(destination_osm_id), all_nodes)
         # correct destination due to periodic boundary
-        if direction == 1 && all_start_index > all_destination_index
+        if direction == 1 && all_start_index >= all_destination_index
             all_destination_index += length(all_nodes)
-        elseif direction == -1 && all_start_index < all_destination_index
+        elseif direction == -1 && all_start_index <= all_destination_index
             all_start_index += length(all_nodes)
         end
         indices = mod1.(all_start_index:direction:all_destination_index, length(all_nodes))
@@ -441,7 +441,7 @@ function shadow_graph_from_light_osm_graph(g)
     osm_ids = collect(keys(osm_id_to_nav_id))
 
     rot_dir = 0
-    for start_node_id in vertices(g_nav)
+    @showprogress 1 "rebuilding topology" for start_node_id in vertices(g_nav)
         # get ways this node is part of
         start_osm_id = get_prop(g_nav, start_node_id, :osm_id)
         ways = [g.ways[way_id] for way_id in g.node_to_way[start_osm_id]]

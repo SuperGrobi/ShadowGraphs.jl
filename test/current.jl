@@ -253,3 +253,17 @@ a = try
 catch
 end
 a
+
+
+fig = draw(g, :vertices;
+        figure_params=Dict(:location=>(52.904, -1.18), :zoom_start=>14),
+        radius=3,
+        color=:red)
+    draw!(fig, g, :edges; color=:red, opacity=0.5, weight=5)
+    draw!(fig, g, :edgegeom, opacity=0.5, weight=5)
+
+
+go = graph_from_file("rings.json", network_type=:bike)
+testway = go.ways[29399082]
+
+ShadowGraphs.get_node_list(testway, 323740118, [323740118], 1)
