@@ -20,6 +20,6 @@ include("BuildGraph.jl")
 
 include("Plotting.jl")
 
-export export_graph_to_csv
+export export_graph_to_csv, import_graph_from_csv
 include("Persistence.jl")
 end

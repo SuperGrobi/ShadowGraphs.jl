@@ -26,7 +26,18 @@
     @test filesize("./tmp/full_nodes.csv") > filesize("./tmp/reduced_nodes.csv")
     @test filesize("./tmp/full_graph.csv") == filesize("./tmp/reduced_graph.csv")
 
-    # TODO: load files again and check that the content is correct??
+    @test_throws ArgumentError import_graph_from_csv("./tmp/reduced.csv")
+
+    g_loaded = import_graph_from_csv("./tmp/full.csv")
+    @test nv(g_loaded) == nv(g)
+    @test ne(g_loaded) == ne(g)
+    try
+        project_local!(g_loaded, -1, 53)
+        @test true
+    catch e
+        @test false
+        rethrow(e)
+    end
     
     rm("./tmp", recursive=true)
 end

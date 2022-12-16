@@ -10,23 +10,15 @@ using GraphRecipes
 using ArchGDAL
 using PyCall
 using Colors
-using WebIO
 using Folium
-flm = pyimport("folium")
 
-struct FoliumDrawer
-    x::PyObject
-end
-function Base.show(io::IO, ::MIME"juliavscode/html", map::FoliumDrawer)
-    write(io, repr("text/html", map.x))
-end
+g_shadow = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
+g_shadow
+props(g_shadow, first(edges(g_shadow)))
 
-g_shadow = shadow_graph_from_file("../../data/nottingham/clifton/test_clifton_bike.json"; network_type=:bike);
+export_graph_to_csv("test/data/test.csv", g_shadow)
 
-save_graph_to_csv("dir/test.csv", g_shadow)
-save_graph_to_csv("test.csv", g_shadow)
-save_graph_to_csv("dir/test", g_shadow)
-save_graph_to_csv("test", g_shadow; remove_internal_data=true)
+es = import_graph_from_csv("test/data/test")
 
 g_light.ways
 
