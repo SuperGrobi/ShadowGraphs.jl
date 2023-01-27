@@ -1,9 +1,10 @@
-@testset "plotting" begin
+@testset "plotting from scratch" begin
     g = shadow_graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)
-
-    for i in [:vertices, :edges, :edgegeom, :shadowgeom]
+    p1 = [1, 785, 446, 1584, 1527, 49, 764, 1375, 115]  # normal edges
+    p2 = [1692, 420, 1119, 533, 598, 5, 1632]  # helper nodes at start and end, edge 5 => 1632 is helper edge
+    for i in [:vertices, :edges, :edgegeom, :shadowgeom, p1, p2]
         try
-            draw(g, i; figure_params=Dict(:location=>(52.904, -1.18), :zoom_start=>14))
+            draw(g, i; figure_params=Dict(:location => (52.904, -1.18), :zoom_start => 14))
             @test true
         catch
             @test "error thrown in plotting graph (from scratch) with $i"
@@ -11,10 +12,15 @@
     end
 
     @test_throws ArgumentError draw(g, :nonexistent; color=:red)
+end
 
-    for i in [:vertices, :edges, :edgegeom, :shadowgeom]
+@testset "plotting mutations" begin
+    g = shadow_graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)
+    p1 = [1, 785, 446, 1584, 1527, 49, 764, 1375, 115]  # normal edges
+    p2 = [1692, 420, 1119, 533, 598, 5, 1632]  # helper nodes at start and end, edge 5 => 1632 is helper edge
+    for i in [:vertices, :edges, :edgegeom, :shadowgeom, p1, p2]
         try
-            fig = FoliumMap(location= (52.904, -1.18), zoom_start= 14)
+            fig = FoliumMap(location=(52.904, -1.18), zoom_start=14)
             draw!(fig, g, i)
             @test true
         catch
@@ -22,6 +28,6 @@
         end
     end
 
-    fig = FoliumMap(location= (52.904, -1.18), zoom_start= 14)
+    fig = FoliumMap(location=(52.904, -1.18), zoom_start=14)
     @test_throws ArgumentError draw!(fig, g, :nonexistent; color=:red)
 end

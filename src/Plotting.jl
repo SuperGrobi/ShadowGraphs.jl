@@ -20,7 +20,7 @@ element arguments.
 """
 function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; draw_arrows=true, kwargs...) where {T<:AbstractMetaGraph}
     @nospecialize
-    kw = Dict{Symbol, Any}(kwargs)
+    kw = Dict{Symbol,Any}(kwargs)
     if series_type === :vertices
         kw[:radius] = get(kw, :radius, 2)
         kw[:color] = get(kw, :color, "#e2b846")
@@ -66,18 +66,25 @@ function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; draw_arrows=tru
 end
 
 """
-    draw(g::T, series_type::Symbol; figure_params=Dict(), kwargs...) where {T<:AbstractMetaGraph}
 
-same as `draw!`, but creates a new `FoliumMap` first.
+    draw!(fig::FoliumMap, g::T, path::AbstractArray; kwargs...) where {T<:AbstractMetaGraph} 
 
-# argumnents
-- same as `draw!` plus:
-- figure_params: dictionary with arguments which are getting passed to the `FoliumMap` constructor (see the [python docs](https://python-visualization.github.io/folium/) and the [leaflet docs](https://leafletjs.com/reference.html) for a full list of all options.)
-
-# returns
-- the newly created figure
+draws the `path` given by node ids in `g` into `fig`. Uses the `:pointgeom`-field of the nodes and the `:edgegeom` field of the edges.
+`kwargs` are applied to both, cirles and lines.
 """
-function Folium.draw(g::T, series_type::Symbol; figure_params=Dict(), kwargs...) where {T<:AbstractMetaGraph}
-    fig = FoliumMap(; figure_params...)
-    return draw!(fig, g, series_type; kwargs...)
+function Folium.draw!(fig::FoliumMap, g::T, path::AbstractArray; kwargs...) where {T<:AbstractMetaGraph}
+    @nospecialize
+    kw = Dict{Symbol,Any}(kwargs)
+    edgegeoms = map(path[1:end-1], path[2:end]) do s, d
+        if has_prop(g, s, d, :edgegeom)
+            return get_prop(g, s, d, :edgegeom)
+        end
+    end
+    draw!(fig, filter(!isnothing, edgegeoms); kw...)
+    for n in path
+        point = get_prop(g, n, :pointgeom)
+        tt = "osm id: $(has_prop(g, n, :osm_id) ? get_prop(g, n, :osm_id) : 0)<br>graph vertex: $n"
+        draw!(fig, point; radius=1.0, fill_opacity=1, fill=true, tooltip=tt, popup=tt, kw...)
+    end
+    return fig
 end
