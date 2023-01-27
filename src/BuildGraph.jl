@@ -408,7 +408,8 @@ in the case of helper edges:
 in the case of non helper edges:
 - `:osm_id`
 - `:tags` (tags of the original osm way, with parsed `width`, `lanes`, `lanes:forward`, `lanes:backward` and `lanes:both_ways`, `oneway` and `reverseway` keys)
-- `:edgegeom` (`ArchGDAL linestring` with the geometry of the edge)
+- `:edgegeom_base` (`ArchGDAL linestring` with the geometry of the edge. Should not be modified during subsequent operations.)
+- `:edgegeom` (copy of `:edgegeom_base`. This one will be modified during offsetting and such.)
 - `:full_length` (length of `edgegeom` in a projected crs)
 - `:parsing_direction` (direction in which we stepped through the original way nodes to get the linestring)
 - `:helper`=false 
@@ -477,6 +478,7 @@ function shadow_graph_from_light_osm_graph(g)
                         :osm_id => simple_way.id,
                         :tags => simple_way.tags,
                         :edgegeom => linestring,
+                        :edgegeom_base => ArchGDAL.clone(linestring),
                         :full_length => projected_length,
                         :parsing_direction => step,
                         :helper => false
