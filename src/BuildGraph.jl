@@ -10,7 +10,7 @@ function width(tags)
         if !(width isa Number)
             width = max([LightOSM.remove_non_numeric(h) for h in split(width, r"[+^;,-]")]...)
         end
-            return abs(width)
+        return abs(width)
     else
         return missing
     end
@@ -32,7 +32,7 @@ function parse_lanes(tags::AbstractDict, tagname)
             return abs(lanes_value)
         elseif lanes_value isa AbstractFloat
             return U(abs(round(lanes_value)))
-        elseif lanes_value isa String 
+        elseif lanes_value isa String
             lanes_value = split(filter(!=('-'), lanes_value), LightOSM.COMMON_OSM_STRING_DELIMITERS)
             lanes_value = [LightOSM.remove_non_numeric(l) for l in lanes_value]
             return U(abs(round(mean(lanes_value))))
@@ -81,7 +81,7 @@ function parse_raw_ways(raw_ways, network_type)
                 tags["rail_type"] = get(tags, "railway", "unknown")
                 tags["electrified"] = get(tags, "electrified", "unknown")
                 tags["gauge"] = get(tags, "gauge", nothing)
-                tags["usage"] = get(tags, "usage",  "unknown")
+                tags["usage"] = get(tags, "usage", "unknown")
                 tags["name"] = get(tags, "name", "unknown")
                 tags["lanes"] = get(tags, "tracks", 1)
                 tags["maxspeed"] = LightOSM.maxspeed(tags)
@@ -145,26 +145,26 @@ function add_edge_with_data!(g, s, d; data=Dict())
 
         p1 = ArchGDAL.pointalongline(data[:edgegeom], 0.1 * geomlength)
         apply_wsg_84!(p1)
-        add_vertex!(g, Dict(:lon=>ArchGDAL.getx(p1, 0), :lat=>ArchGDAL.gety(p1, 0), :pointgeom=>p1, :helper=>true))
+        add_vertex!(g, Dict(:lon => ArchGDAL.getx(p1, 0), :lat => ArchGDAL.gety(p1, 0), :pointgeom => p1, :helper => true))
 
-        id_1 =nv(g)
+        id_1 = nv(g)
         add_edge!(g, s, id_1, :helper, true)
-        
+
         p2 = ArchGDAL.pointalongline(data[:edgegeom], 0.6 * geomlength)
         apply_wsg_84!(p2)
-        add_vertex!(g, Dict(:lon=>ArchGDAL.getx(p2, 0), :lat=>ArchGDAL.gety(p2, 0), :pointgeom=>p2, :helper=>true))
+        add_vertex!(g, Dict(:lon => ArchGDAL.getx(p2, 0), :lat => ArchGDAL.gety(p2, 0), :pointgeom => p2, :helper => true))
         id_2 = nv(g)
         add_edge!(g, id_2, d, :helper, true)
 
         add_edge_with_data!(g, id_1, id_2; data=data)
     elseif has_edge(g, s, d)
-            #@warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
-            # all of this is bad...
-            p = ArchGDAL.pointalongline(data[:edgegeom], 0.5 * ArchGDAL.geomlength(data[:edgegeom]))
-            apply_wsg_84!(p)
-            add_vertex!(g, Dict(:lon=>ArchGDAL.getx(p, 0), :lat=>ArchGDAL.gety(p, 0), :pointgeom=>p, :helper=>true))
-            add_edge!(g, s, nv(g), :helper, true)
-            add_edge_with_data!(g, nv(g), d; data=data)
+        #@warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
+        # all of this is bad...
+        p = ArchGDAL.pointalongline(data[:edgegeom], 0.5 * ArchGDAL.geomlength(data[:edgegeom]))
+        apply_wsg_84!(p)
+        add_vertex!(g, Dict(:lon => ArchGDAL.getx(p, 0), :lat => ArchGDAL.gety(p, 0), :pointgeom => p, :helper => true))
+        add_edge!(g, s, nv(g), :helper, true)
+        add_edge_with_data!(g, nv(g), d; data=data)
     else
         add_edge!(g, s, d)
         for (key, value) in data
@@ -187,7 +187,7 @@ is_circular_way(way::Way) = way.nodes[1] == way.nodes[end]
 
 counts how often every number appears in numbers. Returns dict with `number=>count`
 """
-countall(numbers) = Dict(number=>count(==(number), numbers) for number in unique(numbers))
+countall(numbers) = Dict(number => count(==(number), numbers) for number in unique(numbers))
 
 
 """
@@ -205,8 +205,8 @@ be decomposed into two ways, with the nodes `[10,20,30]` and `[30,40,50,30]`.
 function decompose_way_to_primitives(way::Way)
     length(way.nodes) <= 1 && throw(ArgumentError("there are less than two nodes in way $(way.id)"))
     nodecounts = countall(way.nodes)
-    duplicate_nodes = filter(x->x.second > 1, nodecounts)
-    cut_locations = findall(n->n ∈ keys(duplicate_nodes), way.nodes)
+    duplicate_nodes = filter(x -> x.second > 1, nodecounts)
+    cut_locations = findall(n -> n ∈ keys(duplicate_nodes), way.nodes)
 
     # if nowhere to cut (straight line) or if ring without intersection
     if length(cut_locations) == 0 || cut_locations == [1, length(way.nodes)]
@@ -262,7 +262,7 @@ function get_rotational_direction(way::Way, nodes, direction)
     points = [nodes[node_id].location for node_id in node_ids[1:end-1]]
     x = [i.lon for i in points]
     y = [i.lat for i in points]
-    min_x_ind = findall(e->e==minimum(x), x)
+    min_x_ind = findall(e -> e == minimum(x), x)
 
     min_y_options = y[min_x_ind]
     y_ind = argmin(min_y_options)
@@ -270,14 +270,14 @@ function get_rotational_direction(way::Way, nodes, direction)
 
     x_b = x[ind]
     y_b = y[ind]
-    ind_low = mod1(ind-1, length(points))
+    ind_low = mod1(ind - 1, length(points))
     x_a = x[ind_low]
     y_a = y[ind_low]
-    ind_high = mod1(ind+1, length(points))
+    ind_high = mod1(ind + 1, length(points))
     x_c = x[ind_high]
     y_c = y[ind_high]
 
-    det = (x_b-x_a)*(y_c - y_a) - (x_c - x_a)*(y_b-y_a)
+    det = (x_b - x_a) * (y_c - y_a) - (x_c - x_a) * (y_b - y_a)
     if det > 0
         return 1 * direction
     elseif det < 0
@@ -303,17 +303,17 @@ function add_this_node(g, osm_id)
     # if the node is part of more than one way
     if length(way_ids) > 1
         return true
-    # if the node is the end of a street (has only one neighbour)
+        # if the node is the end of a street (has only one neighbour)
     elseif is_end_node(g.graph, index)
         return true
-    # if the node appears more than once in the nodes of a way
-    # (excluding duplicates caused by circularity)
+        # if the node appears more than once in the nodes of a way
+        # (excluding duplicates caused by circularity)
     else
         way = g.ways[first(way_ids)]  # if there is more than one way, the first if would trigger
         if is_circular_way(way)
             ocurrences = count(==(osm_id), way.nodes[1:end-1])
         else
-            ocurrences = count(==(osm_id), way.nodes)                    
+            ocurrences = count(==(osm_id), way.nodes)
         end
         ocurrences > 1 && (return true)
     end
@@ -339,7 +339,7 @@ function get_node_list(simple_way, start_osm_id, topological_nodes, direction)
     start_osm_id ∉ topological_nodes && throw(ArgumentError("start_osm_id $start_osm_id not in topological_nodes: $topological_nodes"))
     any([n ∉ all_nodes for n in topological_nodes]) && throw(ArgumentError("not all topological nodes ($topological_nodes) are in the original way ($all_nodes)!"))
 
-    large_counts = filter(p->p.second > 1, countall(all_nodes))
+    large_counts = filter(p -> p.second > 1, countall(all_nodes))
     length(large_counts) > 1 && throw(ArgumentError("You input a non simple way (nodes: $all_nodes)"))
 
     if length(large_counts) == 1
@@ -351,8 +351,8 @@ function get_node_list(simple_way, start_osm_id, topological_nodes, direction)
 
     # get index of start node in full and in reduced nodes list
     all_start_index = direction == 1 ? findfirst(==(start_osm_id), all_nodes) : findlast(==(start_osm_id), all_nodes)
-    topological_start_index = direction == 1 ? findfirst(==(start_osm_id), topological_nodes) : findlast(==(start_osm_id), topological_nodes) 
-    topological_destination_index = topological_start_index+direction
+    topological_start_index = direction == 1 ? findfirst(==(start_osm_id), topological_nodes) : findlast(==(start_osm_id), topological_nodes)
+    topological_destination_index = topological_start_index + direction
 
     # in every simple way, at most the the start and end node are the same
     if is_circular_way(simple_way) # start and end node are the same
@@ -418,7 +418,8 @@ function shadow_graph_from_light_osm_graph(g)
     g.node_to_way = Dict(key => unique(value) for (key, value) in g.node_to_way)
     # build clean graph containing only nodes for topologically relevant nodes
     g_nav = MetaDiGraph()
-
+    defaultweight!(g_nav, 0.0)
+    weightfield!(g_nav, :full_length)
     # add only those nodes, which are relevant for topology
     for (osm_id, way_ids) in g.node_to_way
         if add_this_node(g, osm_id)
@@ -431,13 +432,13 @@ function shadow_graph_from_light_osm_graph(g)
                 :lat => lat_point,
                 :lon => lon_point,
                 :pointgeom => point,
-                :helper=>false
+                :helper => false
             )
             add_vertex!(g_nav, data)
         end
     end
 
-    osm_id_to_nav_id = Dict(get_prop(g_nav, i, :osm_id)=>i for i in vertices(g_nav))
+    osm_id_to_nav_id = Dict(get_prop(g_nav, i, :osm_id) => i for i in vertices(g_nav))
     osm_ids = collect(keys(osm_id_to_nav_id))
 
     rot_dir = 0
@@ -447,7 +448,7 @@ function shadow_graph_from_light_osm_graph(g)
         ways = [g.ways[way_id] for way_id in g.node_to_way[start_osm_id]]
         for way in ways
             # decompose way and filter to only include the ones in which the start node is contained
-            simple_ways = filter(simple_way->start_osm_id ∈ simple_way.nodes, decompose_way_to_primitives(way))
+            simple_ways = filter(simple_way -> start_osm_id ∈ simple_way.nodes, decompose_way_to_primitives(way))
             for simple_way in simple_ways
                 # define possible directions in which we are allowed to step through the way
                 if simple_way.tags["oneway"]
@@ -471,7 +472,7 @@ function shadow_graph_from_light_osm_graph(g)
                     project_local!([linestring], ArchGDAL.getx(p, 0), ArchGDAL.gety(p, 0))
                     projected_length = ArchGDAL.geomlength(linestring)
                     project_back!([linestring])
-                    
+
                     data = Dict(
                         :osm_id => simple_way.id,
                         :tags => simple_way.tags,
@@ -525,7 +526,7 @@ function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict}; netw
         graph_type=:static,
         precompute_dijkstra_states=false,
         largest_connected_component=true
-        )
+    )
     for i in keys(g.ways)
         g.ways[i] = parsed_ways[i]
     end
@@ -601,11 +602,11 @@ downloads and builds the shadow graph from OSM.
 `MetaDiGraph` with topologically relevant nodes and edges and relevant data attached to every node and edge.
 """
 function shadow_graph_from_download(download_method::Symbol;
-        network_type::Symbol=:drive,
-        metadata::Bool=false,
-        download_format::Symbol=:json,
-        save_to_file_location::Union{String,Nothing}=nothing,
-        download_kwargs...)
+    network_type::Symbol=:drive,
+    metadata::Bool=false,
+    download_format::Symbol=:json,
+    save_to_file_location::Union{String,Nothing}=nothing,
+    download_kwargs...)
     obj = download_osm_network(download_method,
         network_type=network_type,
         metadata=metadata,
