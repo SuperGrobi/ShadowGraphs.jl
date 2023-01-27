@@ -418,7 +418,6 @@ function shadow_graph_from_light_osm_graph(g)
     g.node_to_way = Dict(key => unique(value) for (key, value) in g.node_to_way)
     # build clean graph containing only nodes for topologically relevant nodes
     g_nav = MetaDiGraph()
-    # TODO: Test that this works...
     defaultweight!(g_nav, 0.0)
     weightfield!(g_nav, :full_length)
     # add only those nodes, which are relevant for topology
