@@ -413,6 +413,8 @@ in the case of non helper edges:
 - `:full_length` (length of `edgegeom` in a projected crs)
 - `:parsing_direction` (direction in which we stepped through the original way nodes to get the linestring)
 - `:helper`=false 
+the props '[:osm_id, :tags, :edgegeom_base, :parsing_direction, :helper] are considered read-only.
+(Editing them might cause strange behaviour. Always duplicate the `:edgegeom_base` with `ArchGDAL.clone`)
 """
 function shadow_graph_from_light_osm_graph(g)
     # make the streets nodes are a part contain only unique elements
