@@ -19,7 +19,7 @@ saves the shadow graph to a selection of csv files:
 # returns
 saves multiple files to disk.
 """
-function export_graph_to_csv(path, graph; remove_internal_data = false)
+function export_graph_to_csv(path, graph; remove_internal_data=false)
     if contains(path, '/')
         lastslash = findlast(==('/'), path)
         file = path[lastslash+1:end]
@@ -44,10 +44,10 @@ function export_graph_to_csv(path, graph; remove_internal_data = false)
         cols_exist = names(node_df)
         select!(node_df, Not([i for i in cols_to_remove if i in cols_exist]))
     end
-    
+
     node_file = dir * filename * "_nodes.csv"
     CSV.write(node_file, node_df; transform=trans)
-    
+
 
     edge_df = DataFrame()
     for edge in edges(graph)
@@ -57,7 +57,7 @@ function export_graph_to_csv(path, graph; remove_internal_data = false)
         push!(edge_df, eprop; cols=:union)
     end
     if remove_internal_data
-        cols_to_remove = ["tags", "shadowpartgeom", "shadowed_part_length", "parsing_direction", "geomlength"]
+        cols_to_remove = ["tags", "shadowpartgeom", "shadowed_part_length", "parsing_direction", "geomlength", "edgegeom_base"]
         cols_exist = names(edge_df)
         select!(edge_df, Not([i for i in cols_to_remove if i in cols_exist]))
     end
@@ -100,7 +100,7 @@ function import_graph_from_csv(path)
     graph_file = dir * filename * "_graph.csv"
 
     node_df = CSV.read(node_file, DataFrame)
-    edge_df = CSV.read(edge_file, DataFrame; types=Dict(:tags=>Dict{String, Any}))
+    edge_df = CSV.read(edge_file, DataFrame; types=Dict(:tags => Dict{String,Any}))
     graph_df = CSV.read(graph_file, DataFrame)
 
     g = MetaDiGraph()

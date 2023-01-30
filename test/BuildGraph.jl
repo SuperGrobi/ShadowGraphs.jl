@@ -427,7 +427,10 @@ end
         for e in test_edges
             @test has_prop(g, e, :full_length)
             @test get_prop(g, e, :full_length) > 0
+            @test ArchGDAL.distance(get_prop(g, e, :edgegeom), get_prop(g, e, :edgegeom_base)) ≈ 0
+            @test ArchGDAL.geomlength(get_prop(g, e, :edgegeom)) ≈ ArchGDAL.geomlength(get_prop(g, e, :edgegeom_base))
         end
+        @test mapreduce(e -> has_prop(g, e, :edgegeom) && has_prop(g, e, :edgegeom_base), &, filter_edges(g, :helper, false))
     end
 
     @testset "shadow_graph_from_object" begin
