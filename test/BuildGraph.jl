@@ -431,6 +431,12 @@ end
             @test ArchGDAL.geomlength(get_prop(g, e, :edgegeom)) ≈ ArchGDAL.geomlength(get_prop(g, e, :edgegeom_base))
         end
         @test mapreduce(e -> has_prop(g, e, :edgegeom) && has_prop(g, e, :edgegeom_base), &, filter_edges(g, :helper, false))
+
+        # test if all relevant props are set
+        @test has_prop(g, :crs)
+        @test has_prop(g, :offset_dir)
+        @test has_prop(g, :center_lon)
+        @test has_prop(g, :center_lat)
     end
 
     @testset "shadow_graph_from_object" begin
