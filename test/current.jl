@@ -12,8 +12,20 @@ using ArchGDAL
 using PyCall
 using Colors
 using Folium
+using Plots
 
 g_shadow = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
+
+pg = consolidate_nodes_geom(g_shadow, 10)
+
+plot(pg, ratio=1, size=(800, 800))
+
+as = [ArchGDAL.buffer(a, 100) for a in getgeom(pg)]
+someus = foldl(ArchGDAL.union, as)
+
+plot(as, ratio=1, size=(800, 800))
+plot!(someus)
+
 
 center_BoundingBox(BoundingBox(get_prop(g_shadow, v, :pointgeom) for v in vertices(g_shadow)))
 
