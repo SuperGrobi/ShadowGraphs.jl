@@ -20,26 +20,20 @@ element arguments.
 """
 function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; draw_arrows=true, kwargs...) where {T<:AbstractMetaGraph}
     @nospecialize
-    kw = Dict{Symbol,Any}(kwargs)
     if series_type === :vertices
-        kw[:radius] = get(kw, :radius, 2)
-        kw[:color] = get(kw, :color, "#e2b846")
         for vertex in vertices(g)
             tt = "osm id: $(has_prop(g, vertex, :osm_id) ? get_prop(g, vertex, :osm_id) : 0)<br>graph vertex: $vertex"
             lon = get_prop(g, vertex, :lon)
             lat = get_prop(g, vertex, :lat)
-            draw!(fig, lon, lat, :circle; tooltip=tt, popup=tt, kw...)
+            draw!(fig, lon, lat, :circle; radius=2, color="#e2b846", tooltip=tt, popup=tt, kwargs...)
         end
     elseif series_type === :edges
-        kw[:opacity] = get(kw, :opacity, 0.5)
-        kw[:weight] = get(kw, :weight, 2)
-        kw[:color] = get(kw, :color, "#e56c6c")
         for edge in edges(g)
             sla = get_prop(g, src(edge), :lat)
             slo = get_prop(g, src(edge), :lon)
             dla = get_prop(g, dst(edge), :lat)
             dlo = get_prop(g, dst(edge), :lon)
-            draw!(fig, [slo, dlo], [sla, dla], :line; kw...)
+            draw!(fig, [slo, dlo], [sla, dla], :line, opacity=0.5, weight=2, color="#e56c6c", kwargs...)
         end
     elseif series_type === :edgegeom
         for edge in edges(g)
@@ -49,15 +43,14 @@ function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; draw_arrows=tru
             full_length = has_prop(g, edge, :full_length) ? get_prop(g, edge, :full_length) : -1
             tt = "osm id: $id<br>shadow length: $(round(shadowed_length; digits=2))<br>total length: $(round(full_length; digits=2))<br>fraction in shadow: $(round(shadowed_length/full_length; digits=2))"
             linestring = get_prop(g, edge, :edgegeom)
-            draw!(fig, linestring; tooltip=tt, popup=tt, kw...)
-            draw_arrows && draw!(fig, ArchGDAL.pointalongline(linestring, 0.8 * ArchGDAL.geomlength(linestring)); fill=true, fill_opacity=1, radius=1.0, kw...)
+            draw!(fig, linestring; tooltip=tt, popup=tt, kwargs...)
+            draw_arrows && draw!(fig, ArchGDAL.pointalongline(linestring, 0.8 * ArchGDAL.geomlength(linestring)); fill=true, fill_opacity=1, radius=1.0, kwargs...)
         end
     elseif series_type === :shadowgeom
-        kw[:color] = get(kw, :color, "black")
         for edge in edges(g)
             !has_prop(g, edge, :shadowgeom) && continue
             line = get_prop(g, edge, :shadowgeom)
-            draw!(fig, line; kw...)
+            draw!(fig, line; color=:black, kwargs...)
         end
     else
         throw(ArgumentError("the series type $series_type is not supported. Available types are: [:vertices, :edges, :edgegeom, :shadowgeom]"))
@@ -74,17 +67,16 @@ draws the `path` given by node ids in `g` into `fig`. Uses the `:pointgeom`-fiel
 """
 function Folium.draw!(fig::FoliumMap, g::T, path::AbstractArray; kwargs...) where {T<:AbstractMetaGraph}
     @nospecialize
-    kw = Dict{Symbol,Any}(kwargs)
     edgegeoms = map(path[1:end-1], path[2:end]) do s, d
         if has_prop(g, s, d, :edgegeom)
             return get_prop(g, s, d, :edgegeom)
         end
     end
-    draw!(fig, filter(!isnothing, edgegeoms); kw...)
+    draw!(fig, filter(!isnothing, edgegeoms); kwargs...)
     for n in path
         point = get_prop(g, n, :pointgeom)
         tt = "osm id: $(has_prop(g, n, :osm_id) ? get_prop(g, n, :osm_id) : 0)<br>graph vertex: $n"
-        draw!(fig, point; radius=1.0, fill_opacity=1, fill=true, tooltip=tt, popup=tt, kw...)
+        draw!(fig, point; radius=1.0, fill_opacity=1, fill=true, tooltip=tt, popup=tt, kwargs...)
     end
     return fig
 end
