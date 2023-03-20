@@ -502,6 +502,9 @@ function shadow_graph_from_light_osm_graph(g)
 
     set_prop!(g_nav, :crs, OSM_ref[])
     set_prop!(g_nav, :offset_dir, rot_dir)
+    g_lon, g_lat = center_BoundingBox(BoundingBox(get_prop(g_nav, v, :pointgeom) for v in vertices(g_nav)))
+    set_prop!(g_nav, :center_lon, g_lon)
+    set_prop!(g_nav, :center_lat, g_lat)
     return g_nav
 end
 
