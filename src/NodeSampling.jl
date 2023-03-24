@@ -66,6 +66,13 @@ function consolidate_nodes_geom(g, radius)
     return closest_ids, incoming_lengths, convex_hulls
 end
 
+
+"""
+
+    get_points_to_consolidate(g, ids) 
+    
+converts the node locations of the nodes with id `ids` in `g` to an `ArchGDAL.multipoint`.
+"""
 function get_points_to_consolidate(g, ids)
     points_to_consolidate = ArchGDAL.createmultipoint()
     reinterp_crs!(points_to_consolidate, get_prop(g, :crs))
@@ -75,6 +82,12 @@ function get_points_to_consolidate(g, ids)
     return points_to_consolidate
 end
 
+"""
+
+    get_closest_id(g, centroid, ids)
+
+gets the id of node-`ids` in `g`, that is located closest to the `centroid`.
+"""
 function get_closest_id(g, centroid, ids)
     min_data = findmin(ids) do v
         point = get_prop(g, v, :pointgeom)
@@ -83,6 +96,19 @@ function get_closest_id(g, centroid, ids)
     return ids[min_data[2]]
 end
 
+"""
+
+    get_inbound_lengths(g, ids)
+
+returns the sum of the `:full_length` props of all edges which enter the cluster of nodes given by `id`.
+This might sometimes underestimate the real full length, when the entering edge is a helper edge. In that
+case, this edge gets a weight of 0.0. We could fix this problem by making the destination of the non-helper
+edge always a non-helper node, and placing the helper nodes on top of their respective sources. (#TODO).
+That way we can never "cut" a cluster along the helper edges and get a length of zero. Or we somehow move up (or down?)
+the string of helpers to find the correct edge. This is not very nice to implement, the former option will
+destroy all ploting we have left, and both will probably not change the results too much. So for now we have to live with
+that problem. 
+"""
 function get_inbound_lengths(g, ids)
     sum(ids) do id
         inns = filter(i -> !(i in ids), inneighbors(g, id))
@@ -96,7 +122,16 @@ function get_inbound_lengths(g, ids)
     end
 end
 
+"""
 
+    consolidate_nodes_geom_slow(g, radius)
+
+slow not exactly the same function as `consolidate_nodes_geom`. This implementation is heavily inspired
+by `consolidate_intersections` from `osmnx`, whereas `consolidate_nodes_geom` uses a different approach.
+Funnily, this function gets faster for large buffer radii, while `consolidate_nodes_geom` gets fast for
+smaller radii.
+This function is more or less legacy code, but nice to have for testing, to validate the results from `consolidate_nodes_geom`.
+"""
 function consolidate_nodes_geom_slow(g, radius)
     project_local!(g, get_prop(g, :center_lon), get_prop(g, :center_lat))
     bufferzones = ArchGDAL.buffer.((get_prop(g, v, :pointgeom) for v in vertices(g)), radius, 30)
