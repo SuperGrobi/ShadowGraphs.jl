@@ -4,14 +4,19 @@
 
 Consolidation of nodes akin to `consolidate_intersections` from `osmnx` (should we just translate that thing into julia? Would be nice...
 (Write me a message if you want to get that project started.))
-if circle with `radius` around node i overlaps circle with `radius` around node j, then i and j are getting consolidated.
+if circle with `radius` around node i overlaps circle with `radius` around node j, then i and j are getting consolidated, but only,
+if the original network structure allows it. (Nodes which are geographically close, but far apart in the network should not be consolidated.)
 
-Returns `(ids, convex_hulls)`
+This assumes, that the graph we put in is already simplified in such a way, that the edges only represent meaningful street segments, and not, for
+example, a very slowly turning, but non branching curve. (Or think of two nodes splitting one of these streets where going one way is separate
+from going the other way, but just by a bit of grass or something.)
 
-where `ids` is a vector of vertex-ids in g, which are closest to the centroids of the sets which are getting consolidated in the
+Returns `(ids, incoming_lengths, convex_hulls)` where:
+- `ids` is a vector of vertex-ids in g, which are closest to the centroids of the sets which are getting consolidated in the
 above described fashion. The id is guaranteed to be from the set of ids, which are getting consolidated.
-
+- `incoming_lengths`: array of the sum over the `full_length` props of all the edges inbound to all the consolidated clusters.
 For all consolidated sets with 3 or more consolidated points, we return the convex hull of the consolidated set, mainly for visualisation purposes.
+
 """
 function consolidate_nodes_geom(g, radius)
     project_local!(g, get_prop(g, :center_lon), get_prop(g, :center_lat))
@@ -22,29 +27,43 @@ function consolidate_nodes_geom(g, radius)
     for v in vertices(g)
         intersections_square = @chain v get_prop(g, _, :pointgeom) rect_from_geom(buffer=radius) intersects_with(rt, _)
         for neigh in intersections_square
-            if v != neigh.val.data && ArchGDAL.distance(get_prop(g, v, :pointgeom), neigh.val.pointgeom) <= radius
+            edge_in_graph = has_edge(g, v, neigh.val.data) || has_edge(g, neigh.val.data, v)
+            # if not self loop and close enough and the edge (or its reverse) is in the orginal graph
+            if v != neigh.val.data && ArchGDAL.distance(get_prop(g, v, :pointgeom), neigh.val.pointgeom) <= radius && edge_in_graph
                 adj[v, neigh.val.data] = true
             end
         end
     end
     components = connected_components(SimpleGraph(adj))
+    closest_ids = Int[]
+    incoming_lengths = Float64[]
     convex_hulls = []
-    closest_ids = map(components) do consolidation_ids
+    for consolidation_ids in components
         if length(consolidation_ids) == 1
             id = first(consolidation_ids)
-            return id
+            total_length = sum(inneighbors(g, id); init=0.0) do v
+                if has_prop(g, v, id, :full_length)
+                    get_prop(g, v, id, :full_length)
+                else
+                    0.0
+                end
+            end
         else
             points_to_consolidate = get_points_to_consolidate(g, consolidation_ids)
             centroid = ArchGDAL.centroid(points_to_consolidate)
             if length(consolidation_ids) >= 3
-                # maps mutating state. This is not what curry intended.
-                push!(convex_hulls, ArchGDAL.convexhull(points_to_consolidate))
+                conv_hull = ArchGDAL.convexhull(points_to_consolidate)
+                push!(convex_hulls, ArchGDAL.buffer(conv_hull, radius / 2, 5))
             end
-            return get_closest_id(g, centroid, consolidation_ids)
+            id = get_closest_id(g, centroid, consolidation_ids)
+            total_length = get_inbound_lengths(g, consolidation_ids)
         end
+        push!(closest_ids, id)
+        push!(incoming_lengths, total_length)
     end
     project_back!(g)
-    return closest_ids, convex_hulls
+    project_back!(convex_hulls)
+    return closest_ids, incoming_lengths, convex_hulls
 end
 
 function get_points_to_consolidate(g, ids)
@@ -62,6 +81,19 @@ function get_closest_id(g, centroid, ids)
         ArchGDAL.distance(centroid, point)
     end
     return ids[min_data[2]]
+end
+
+function get_inbound_lengths(g, ids)
+    sum(ids) do id
+        inns = filter(i -> !(i in ids), inneighbors(g, id))
+        sum(inns, init=0.0) do s
+            if has_prop(g, s, id, :full_length)
+                get_prop(g, s, id, :full_length)
+            else
+                0.0
+            end
+        end
+    end
 end
 
 

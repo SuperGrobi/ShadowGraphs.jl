@@ -17,13 +17,34 @@ using SparseArrays
 
 g_shadow = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
 
-ids, hulls = consolidate_nodes_geom(g_shadow, 5)
+ids, lengths, hulls = consolidate_nodes_geom(g_shadow, 5)
+ids
 
-clusters = map(1:10) do dist
-    ids, hulls = consolidate_nodes_geom(g_shadow, dist)
-    return maximum(ArchGDAL.geomarea(h) for h in hulls)
+props(g_shadow, ids[5])
+
+ids[4]
+lengths
+begin
+    r = 1:0.1:20
+    cluster_data = map(r) do dist
+        ids, hulls = consolidate_nodes_geom(g_shadow, dist)
+        return length(ids), maximum(ArchGDAL.geomarea(h) for h in hulls)
+    end
+    plot(r, getindex.(cluster_data, 1), ylabel="number of consolidated nodes", xlims=(:auto, :auto), label="nodes", c=1, legend=:left, ylims=(0, :auto), lw=2)
+    ax2 = twinx()
+    plot!(framestyle=:box, title="distance merging intersection nodes")
+    plot!(ax2, r, getindex.(cluster_data, 2), xlabel="merge radius", ylabel="largest convex hull", xlims=(:auto, :auto), label="hull area", c=2, legend=:right, ylims=(0, :auto), lw=2)
+    hline!(ax2, [100 * 100], label="100m*100m", c=:black, lw=2, alpha=0.4, ls=:dash)
 end
 
+begin
+    f = draw(g_shadow, :vertices, radius=5)
+    draw!(f, g_shadow, :edges)
+    draw!(f, hulls; fill_opacity=0.5)
+    foreach(v -> draw!(f, get_prop(g_shadow, v, :pointgeom), radius=10), ids)
+    f
+end
+#draw!(f, g_shadow, :edgegeom)
 plot(clusters)
 
 hulls
