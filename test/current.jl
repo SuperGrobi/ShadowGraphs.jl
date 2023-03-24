@@ -12,13 +12,43 @@ using ArchGDAL
 using PyCall
 using Colors
 using Folium
-using Plots
+using BenchmarkTools
+using SparseArrays
 
 g_shadow = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
 
-pg = consolidate_nodes_geom(g_shadow, 10)
+ids, hulls = consolidate_nodes_geom(g_shadow, 5)
 
-plot(pg, ratio=1, size=(800, 800))
+clusters = map(1:10) do dist
+    ids, hulls = consolidate_nodes_geom(g_shadow, dist)
+    return maximum(ArchGDAL.geomarea(h) for h in hulls)
+end
+
+plot(clusters)
+
+hulls
+
+begin
+    plot(ratio=1)
+    for i in hulls
+        plot!(i)
+    end
+    plot!()
+end
+
+area, points, closest_indices, centroids = consolidate_nodes_geom_slow(g_shadow, 100)
+closest_indices .== ids
+points
+begin
+    plot(area, ratio=1)
+    foreach(p -> plot!(p, ratio=1), points)
+    plot!(centroids, m=:x, ms=20, msw=10, c=[1 2 3 4])
+end
+
+@benchmark consolidate_nodes_geom_slow(g_shadow, 100)
+@benchmark consolidate_nodes_geom(g_shadow, 20)
+
+
 
 as = [ArchGDAL.buffer(a, 100) for a in getgeom(pg)]
 someus = foldl(ArchGDAL.union, as)

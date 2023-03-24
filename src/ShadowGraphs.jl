@@ -11,7 +11,10 @@ using Statistics
 using DataFrames
 using StatsBase
 using GeoInterface
+using SpatialIndexing
 using CSV
+using Chain
+using SparseArrays
 
 const EdgeGeomType = Union{ArchGDAL.IGeometry{ArchGDAL.wkbLineString},ArchGDAL.IGeometry{ArchGDAL.wkbMultiLineString}}
 include("Projection.jl")
@@ -24,6 +27,6 @@ include("Plotting.jl")
 export export_graph_to_csv, import_graph_from_csv
 include("Persistence.jl")
 
-export consolidate_nodes_geom
+export consolidate_nodes_geom, consolidate_nodes_geom_slow
 include("NodeSampling.jl")
 end
