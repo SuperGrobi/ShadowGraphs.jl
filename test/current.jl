@@ -14,20 +14,25 @@ using Colors
 using Folium
 using BenchmarkTools
 using SparseArrays
+import Folium: draw, draw!
 
 g_shadow = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
 
-ids, lengths, hulls = consolidate_nodes_geom(g_shadow, 5)
+all_neighbors(g_shadow, 1000)
+neighbors(g_shadow, 1000)
+ids, incoming_edges, lengths, hulls = consolidate_nodes_geom(g_shadow, 10.5)
 ids
 
-props(g_shadow, ids[5])
+outneighbors(g_shadow, 1000)
+inneighbors(g_shadow, 1000)
+has_edge(g_shadow, 373, 1000)
 
-ids[4]
-lengths
+g_shadow
+
 begin
     r = 1:0.1:20
     cluster_data = map(r) do dist
-        ids, hulls = consolidate_nodes_geom(g_shadow, dist)
+        ids, _, _, hulls = consolidate_nodes_geom(g_shadow, dist)
         return length(ids), maximum(ArchGDAL.geomarea(h) for h in hulls)
     end
     plot(r, getindex.(cluster_data, 1), ylabel="number of consolidated nodes", xlims=(:auto, :auto), label="nodes", c=1, legend=:left, ylims=(0, :auto), lw=2)
@@ -38,14 +43,51 @@ begin
 end
 
 begin
-    f = draw(g_shadow, :vertices, radius=5)
+    p1 = plot(framestyle=:box, ylims=(0, :auto))
+    mean_lengths = []
+    median_lengths = []
+    rs = [0, 5, 10, 20]
+    for (i, r) in enumerate(rs)
+        ids, incoming_edges, lengths, hulls = consolidate_nodes_geom(g_shadow, r)
+        incoming_edges = vcat(incoming_edges...)
+        incoming_lengths = [get_prop(g_shadow, e, :full_length) for e in incoming_edges if has_prop(g_shadow, e, :full_length)]
+        histogram!(p1, incoming_lengths, label="r=$r", bins=0:5:100, lw=0.4, bar_width=6 - i)
+    end
+    rs = 0:20
+    for r in rs
+        ids, incoming_edges, lengths, hulls = consolidate_nodes_geom(g_shadow, r)
+        incoming_edges = vcat(incoming_edges...)
+        incoming_lengths = [get_prop(g_shadow, e, :full_length) for e in incoming_edges if has_prop(g_shadow, e, :full_length)]
+        push!(mean_lengths, mean(incoming_lengths))
+        push!(median_lengths, median(incoming_lengths))
+    end
+    plot!(p1, xlabel="street length [m]", ylabel="counts", title="edge lengths after consolidation", xlims=(0, :auto))
+    p2 = plot(framestyle=:box, xlabel="merge radius [m]", ylabel="length [m]")
+    plot!(p2, rs, mean_lengths, label="mean")
+    plot!(p2, rs, median_lengths, label="median", ylims=(0, :auto), xlims=(0, :auto))
+    plot!(x -> 2sqrt(2) * x + 60, 0, last(rs), label="2*sqrt(2)*r+60")
+    plot(p1, p2, layout=(2, 1), size=(800, 800))
+end
+
+begin
+    f = draw(hulls; fill_opacity=0.3, figure_params=Dict(:height => 1000))
     draw!(f, g_shadow, :edges)
-    draw!(f, hulls; fill_opacity=0.5)
-    foreach(v -> draw!(f, get_prop(g_shadow, v, :pointgeom), radius=10), ids)
+    foreach(v -> draw!(f, get_prop(g_shadow, v, :pointgeom), radius=10, fill=true), ids)
+    draw!(f, g_shadow, :vertices, radius=3)
+    draw!(f, g_shadow, :edgegeom)
     f
 end
 #draw!(f, g_shadow, :edgegeom)
 plot(clusters)
+
+incoming_lengths = [get_prop(g_shadow, e, :full_length) for e in edges(g_shadow) if has_prop(g_shadow, e, :full_length)] |> sort
+
+cutoff_filtered = [mean(incoming_lengths[i:end]) for i in 1:length(incoming_lengths)]
+
+plot(incoming_lengths, cutoff_filtered)
+plot!(x -> sqrt(2) * x + 60, xlims=(0, 20), ylims=(50, 100))
+
+
 
 hulls
 
@@ -69,7 +111,7 @@ end
 @benchmark consolidate_nodes_geom_slow(g_shadow, 100)
 @benchmark consolidate_nodes_geom(g_shadow, 20)
 
-
+histogram([get_prop(g_shadow, e, :full_length) for e in edges(g_shadow) if has_prop(g_shadow, e, :full_length)])
 
 as = [ArchGDAL.buffer(a, 100) for a in getgeom(pg)]
 someus = foldl(ArchGDAL.union, as)

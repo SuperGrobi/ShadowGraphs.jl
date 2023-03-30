@@ -3,9 +3,10 @@
     consolidate_nodes_geom(g, radius)
 
 Consolidation of nodes akin to `consolidate_intersections` from `osmnx` (should we just translate that thing into julia? Would be nice...
-(Write me a message if you want to get that project started.))
-if circle with `radius` around node i overlaps circle with `radius` around node j, then i and j are getting consolidated, but only,
-if the original network structure allows it. (Nodes which are geographically close, but far apart in the network should not be consolidated.)
+(Write me a message if you want to get that project started.)), but uses the `:full_length` prop, rather than the geometric distance between nodes.
+if there exists an edge between i and j (or j and i) and the  `:full_length` prop of the edge i->j (or j->i) is less than `2*radius`,
+then i and j are getting consolidated. This definition is essentially turing every directed edge in a undirected edge, with the minimum of `:full_length`
+as a weight. This also means that Nodes which are geographically close, but far apart in street-space are not getting consolidated.
 
 This assumes, that the graph we put in is already simplified in such a way, that the edges only represent meaningful street segments, and not, for
 example, a very slowly turning, but non branching curve. (Or think of two nodes splitting one of these streets where going one way is separate
@@ -22,20 +23,21 @@ function consolidate_nodes_geom(g, radius)
     project_local!(g, get_prop(g, :center_lon), get_prop(g, :center_lat))
 
     radius *= 2  # because that is what osmnx is doing...
-    rt = build_point_rtree((get_prop(g, v, :pointgeom) for v in vertices(g)), vertices(g), true)
     adj = spzeros(Bool, nv(g), nv(g))
     for v in vertices(g)
-        intersections_square = @chain v get_prop(g, _, :pointgeom) rect_from_geom(buffer=radius) intersects_with(rt, _)
-        for neigh in intersections_square
-            edge_in_graph = has_edge(g, v, neigh.val.data) || has_edge(g, neigh.val.data, v)
-            # if not self loop and close enough and the edge (or its reverse) is in the orginal graph
-            if v != neigh.val.data && ArchGDAL.distance(get_prop(g, v, :pointgeom), neigh.val.pointgeom) <= radius && edge_in_graph
-                adj[v, neigh.val.data] = true
+        in_edges = Edge.(inneighbors(g, v), v)
+        out_edges = Edge.(v, outneighbors(g, v))
+        for e in [in_edges; out_edges]
+            street_length = has_prop(g, e, :full_length) ? get_prop(g, e, :full_length) : 0.0
+            if street_length < radius
+                adj[src(e), dst(e)] = true
+                adj[dst(e), src(e)] = true
             end
         end
     end
     components = connected_components(SimpleGraph(adj))
     closest_ids = Int[]
+    incoming_edges = []
     incoming_lengths = Float64[]
     convex_hulls = []
     for consolidation_ids in components
@@ -58,12 +60,13 @@ function consolidate_nodes_geom(g, radius)
             id = get_closest_id(g, centroid, consolidation_ids)
             total_length = get_inbound_lengths(g, consolidation_ids)
         end
+        push!(incoming_edges, get_inbound_edges(g, consolidation_ids))
         push!(closest_ids, id)
         push!(incoming_lengths, total_length)
     end
     project_back!(g)
-    project_back!(convex_hulls)
-    return closest_ids, incoming_lengths, convex_hulls
+    length(convex_hulls) > 0 && project_back!(convex_hulls)
+    return closest_ids, incoming_edges, incoming_lengths, convex_hulls
 end
 
 
@@ -119,6 +122,14 @@ function get_inbound_lengths(g, ids)
                 0.0
             end
         end
+    end
+end
+
+
+function get_inbound_edges(g, ids)
+    mapreduce(vcat, ids) do id
+        inns = filter(i -> !(i in ids), inneighbors(g, id))
+        return Edge.(inns, id)
     end
 end
 
