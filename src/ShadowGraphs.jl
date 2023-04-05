@@ -38,7 +38,7 @@ The value of an entry in the RTree is a named tuple with: `(orig=original_geomet
 where `orig` is the original geometry stored in `props[:pointgeom]` or `props[:edgegeom]`, and `prep` is the prepared geometry, derived from `orig`. The latter one
 can be used in a few `ArchGDAL` functions to get higher performance, for example in intersection testing, because relevant values get precomputed and cashed in the
 prepared geometry, rather than precomputed on every test. Note that only the first element in these tests can be a prepared geometry,
-for example `ArchGDAL.intersects(normal_geom, prepared_geom)` is a highway to segfault-town, where `ArchGDAL.intersects(prepared_geom, normal_geom)` is fine and great.
+for example `ArchGDAL.intersects(normal_geom, prepared_geom)` is a highway to the segfault-zone, where `ArchGDAL.intersects(prepared_geom, normal_geom)` is fine and great.
 
 The `type` entry is either `:vertex` or `:edge`, to help distinguish between entries for edges and vertices.
 
