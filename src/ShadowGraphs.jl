@@ -10,6 +10,7 @@ using ArchGDAL
 using Statistics
 using DataFrames
 using StatsBase
+using SpatialIndexing
 using CSV
 
 const EdgeGeomType = Union{ArchGDAL.IGeometry{ArchGDAL.wkbLineString},ArchGDAL.IGeometry{ArchGDAL.wkbMultiLineString}}
