@@ -11,6 +11,7 @@ using Statistics
 using DataFrames
 using StatsBase
 using SpatialIndexing
+using GeoInterface
 using CSV
 
 const EdgeGeomType = Union{ArchGDAL.IGeometry{ArchGDAL.wkbLineString},ArchGDAL.IGeometry{ArchGDAL.wkbMultiLineString}}

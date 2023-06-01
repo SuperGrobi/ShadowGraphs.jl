@@ -33,7 +33,7 @@ function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; draw_arrows=tru
             slo = get_prop(g, src(edge), :lon)
             dla = get_prop(g, dst(edge), :lat)
             dlo = get_prop(g, dst(edge), :lon)
-            draw!(fig, [slo, dlo], [sla, dla], :line, opacity=0.5, weight=2, color="#e56c6c", kwargs...)
+            draw!(fig, [slo, dlo], [sla, dla], :line; opacity=0.5, weight=2, color="#e56c6c", kwargs...)
         end
     elseif series_type === :edgegeom
         for edge in edges(g)
@@ -67,12 +67,46 @@ draws the `path` given by node ids in `g` into `fig`. Uses the `:pointgeom`-fiel
 """
 function Folium.draw!(fig::FoliumMap, g::T, path::AbstractArray; kwargs...) where {T<:AbstractMetaGraph}
     @nospecialize
-    edgegeoms = map(path[1:end-1], path[2:end]) do s, d
-        if has_prop(g, s, d, :edgegeom)
-            return get_prop(g, s, d, :edgegeom)
+    edgegeoms = [get_prop(g, s, d, :edgegeom) for (s, d) in zip(path[1:end-1], path[2:end]) if has_prop(g, s, d, :edgegeom)]
+    edgegeoms_coords = map(edgegeoms) do line
+        [collect(getcoord(p)) for p in getgeom(line)]
+    end
+    # build our own set of points, for pretty plotting
+    points_new = [edgegeoms_coords[1][1]]
+    start_index = 2
+    for i in 1:length(edgegeoms)-1
+        ep1 = edgegeoms_coords[i]
+        ep2 = edgegeoms_coords[i+1]
+        if GeoInterface.intersects(edgegeoms[i], edgegeoms[i+1])
+            for j in start_index:length(ep1)
+                did_intersect = false
+                for k in 1:length(ep2)-1
+                    if switches_side(points_new[end], ep1[j], ep2[k], ep2[k+1])
+                        strech_factor = intersection_distance(points_new[end], ep1[j], ep2[k], ep2[k+1])[1]
+                        if 0.0 < strech_factor < 1.0
+                            push!(points_new, (1 - strech_factor) * points_new[end] + strech_factor * (ep1[j]))
+                            start_index = k + 1
+                            did_intersect = true
+                            break
+                        end
+                    end
+                end
+                if !did_intersect
+                    push!(points_new, ep1[j])
+                end
+            end
+        else
+            points_new = [points_new; ep1[start_index:end]]
+            start_index = 1
         end
     end
-    draw!(fig, filter(!isnothing, edgegeoms); kwargs...)
+    points_new = [points_new; edgegeoms_coords[end][start_index:end]]
+    @show points_new
+    lons = mapfoldl(points -> getindex.(points, 1), vcat, edgegeoms_coords)
+    lats = mapfoldl(points -> getindex.(points, 2), vcat, edgegeoms_coords)
+    draw!(fig, lons, lats, :line; kwargs...)
+    draw!(fig, getindex.(points_new, 1), getindex.(points_new, 2), :line, ; color=:green, weight=10)
+    #draw!(fig, edgegeoms; kwargs...)
     for n in path
         point = get_prop(g, n, :pointgeom)
         tt = "osm id: $(has_prop(g, n, :osm_id) ? get_prop(g, n, :osm_id) : 0)<br>graph vertex: $n"

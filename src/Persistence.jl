@@ -57,7 +57,7 @@ function export_graph_to_csv(path, graph; remove_internal_data=false)
         push!(edge_df, eprop; cols=:union)
     end
     if remove_internal_data
-        cols_to_remove = ["tags", "shadowpartgeom", "shadowed_part_length", "parsing_direction", "geomlength", "shadowgeom_segmented", "edgegeom_base"]
+        cols_to_remove = ["tags", "shadowpartgeom", "shadowed_part_length", "parsing_direction", "geomlength", "shadowgeom_segmented"]#, "edgegeom_base"]
         cols_exist = names(edge_df)
         select!(edge_df, Not([i for i in cols_to_remove if i in cols_exist]))
     end
