@@ -25,6 +25,16 @@ include("Plotting.jl")
 export export_graph_to_csv, import_graph_from_csv
 include("Persistence.jl")
 
+export tag_edge_bearings!, single_bearing
+include("Measures.jl")
+
+outedges(g, v) = Edge.(v, outneighbors(g, v))
+inedges(g, v) = Edge.(inneighbors(g, v), v)
+get_prop_default(g, e, p; default=0.0) = has_prop(g, e, p) ? get_prop(g, e, p) : default
+
+export outedges, inedges, get_prop_default
+
+
 """
 
     CoolWalksUtils.build_rtree(g::AbstractMetaGraph)
