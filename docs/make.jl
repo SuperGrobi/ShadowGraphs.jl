@@ -12,7 +12,7 @@ makedocs(;
         prettyurls=get(ENV, "CI", "false") == "true",
         canonical="https://SuperGrobi.github.io/ShadowGraphs.jl",
         edit_link="main",
-        assets=String[],
+        assets=String[]
     ),
     pages=[
         "Home" => "index.md",
@@ -20,10 +20,10 @@ makedocs(;
         "IO" => "Persistence.md",
         "Plotting" => "Plotting.md",
         "Projection" => "Projection.md"
-    ],
+    ]
 )
 
 deploydocs(;
     repo="github.com/SuperGrobi/ShadowGraphs.jl",
-    devbranch="main",
+    devbranch="main"
 )
