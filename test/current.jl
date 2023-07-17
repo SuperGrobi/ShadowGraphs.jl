@@ -11,8 +11,40 @@ using ArchGDAL
 using PyCall
 using Colors
 using Folium
+using CoolWalksUtils
 
 g_shadow = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
+
+g_shadow
+
+bearings, lengths = edge_bearings(g_shadow)
+
+histogram(bearings, weights=lengths)
+
+extrema(bearings)
+
+-eps(0.0)
+
+angle(-1+)
+
+
+draw(g_shadow, :vertices)
+draw!(get_prop(g_shadow, first(edges(g_shadow)), :edgegeom))
+
+props(g_shadow, first(edges(g_shadow)))
+
+begin
+    project_local!(g_shadow)
+    b = single_bearing(get_prop(g_shadow, first(edges(g_shadow)), :edgegeom))
+    project_back!(g_shadow)
+    b
+end
+
+
+plot([0.0, b], ratio=1, xlims=(-2, 2), ylims=(-2, 2), framestyle=:box, arrow=true)
+
+
+
 g_shadow
 props(g_shadow, first(edges(g_shadow)))
 
@@ -42,7 +74,7 @@ mis = [i for i in keys(parsed) if !(i in keys(orig))]
 mis = [i for i in keys(orig) if !(i in keys(parsed))]
 
 begin
-    g, g_nav = shadow_graph_from_file("../../data/nottingham/test_nottingham.json");
+    g, g_nav = shadow_graph_from_file("../../data/nottingham/test_nottingham.json")
     x = [i[2] for i in g.node_coordinates]
     y = [i[1] for i in g.node_coordinates]
     x_nav = [get_prop(g_nav, i, :lon) for i in vertices(g_nav)]
@@ -57,24 +89,24 @@ begin
     for (way_id, way) in g.ways
         nodes = [g.nodes[i] for i in way.nodes]
         locs = [(node.location.lat, node.location.lon) for node in nodes]
-        flm.PolyLine(locs, color = way.tags["oneway"] ? "red" : "green", weight=5).add_to(m)
+        flm.PolyLine(locs, color=way.tags["oneway"] ? "red" : "green", weight=5).add_to(m)
         #flm.PolyLine(locs, color="#" * hex(RGB(rand(), rand(), rand())), weight=5).add_to(m)
     end
 
-    for i in zip(y,x)
+    for i in zip(y, x)
         flm.Circle(location=i, radius=1).add_to(m)
     end
     for i in 1:nv(g_nav)
         lat = get_prop(g_nav, i, :lat)
         lon = get_prop(g_nav, i, :lon)
-        flm.Circle(location=(lat, lon), radius=get_prop(g_nav, i, :osm_id)==0 ? 10 : 3, color=get_prop(g_nav, i, :end) ? "red" : "green", popup="osm id = $(get_prop(g_nav, i, :osm_id))").add_to(m)
+        flm.Circle(location=(lat, lon), radius=get_prop(g_nav, i, :osm_id) == 0 ? 10 : 3, color=get_prop(g_nav, i, :end) ? "red" : "green", popup="osm id = $(get_prop(g_nav, i, :osm_id))").add_to(m)
     end
 
     for edge in edges(g_nav)
-        sla = get_prop(g_nav, src(edge), :lat) + 0.0001 *rand()
-        slo = get_prop(g_nav, src(edge), :lon)+ 0.0001 *rand()
-        dla = get_prop(g_nav, dst(edge), :lat)+ 0.0001 *rand()
-        dlo = get_prop(g_nav, dst(edge), :lon)+ 0.0001 *rand()
+        sla = get_prop(g_nav, src(edge), :lat) + 0.0001 * rand()
+        slo = get_prop(g_nav, src(edge), :lon) + 0.0001 * rand()
+        dla = get_prop(g_nav, dst(edge), :lat) + 0.0001 * rand()
+        dlo = get_prop(g_nav, dst(edge), :lon) + 0.0001 * rand()
         color = "grey"
         if has_prop(g_nav, edge, :edgegeom) && ngeom(get_prop(g_nav, edge, :edgegeom)) == 0
             color = "orange"
@@ -90,7 +122,7 @@ end
 typeof(m)
 
 figure = compose(gplot(g.graph, 10 .* x, -10 .* y, arrowlengthfrac=0.003, nodesize=0.1),
-gplot(g_nav, x_nav, -y_nav))
+    gplot(g_nav, x_nav, -y_nav))
 
 
 
@@ -117,12 +149,12 @@ g.node_to_way[323238122]
 [g.index_to_node[i] for i in outneighbors(g.graph, 2552)]
 
 myg = MetaDiGraph(2)
-add_edge!(myg, 1,2)
+add_edge!(myg, 1, 2)
 add_edge!(myg, 1, 1)
 
-gplot(myg, nodelabel=[1,2])
+gplot(myg, nodelabel=[1, 2])
 
-add_edge!(myg, 1,2)
+add_edge!(myg, 1, 2)
 
 first(g.nodes).second
 
@@ -138,7 +170,7 @@ neighbors(g.graph, 932)
 
 first(g.ways).second
 
-filter(x->x.second.tags["oneway"], g.ways)
+filter(x -> x.second.tags["oneway"], g.ways)
 
 fieldnames(Way)
 
@@ -160,9 +192,9 @@ begin
     points = [(get_prop(g_nav, i, :lon), get_prop(g_nav, i, :lat)) for i in vertices(g_nav) if !get_prop(g_nav, i, :helper)]
     layer = Leaflet.Layer.(points)
     provider = Leaflet.CARTO(:dark_nolabels)
-m = Leaflet.Map(; layers=layer, provider=provider, zoom=3, height=1000, center=[30.0, 120.0]);
-w = Blink.Window()
-body!(w, m)
+    m = Leaflet.Map(; layers=layer, provider=provider, zoom=3, height=1000, center=[30.0, 120.0])
+    w = Blink.Window()
+    body!(w, m)
 end
 
 fieldnames(Way)
@@ -193,10 +225,10 @@ x = cons(1, cons(2, cons(3, nothing)))
 x(false)(false)(true)
 
 function nth(l, n)
-    if n==1
+    if n == 1
         return l(true)
     else
-        return nth(l(false), n-1)
+        return nth(l(false), n - 1)
     end
 end
 
@@ -211,21 +243,21 @@ end
 
 prnlist(x)
 
-line = Way(1, [10,20,30,40,50,60,70,80], Dict("oneway"=>false, "reverseway"=>false, "name"=>"line"))
-ring = Way(2, [10,20,30,40,50,60,70,80, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"ring"))
+line = Way(1, [10, 20, 30, 40, 50, 60, 70, 80], Dict("oneway" => false, "reverseway" => false, "name" => "line"))
+ring = Way(2, [10, 20, 30, 40, 50, 60, 70, 80, 10], Dict("oneway" => false, "reverseway" => false, "name" => "ring"))
 
-loli = Way(3, [10,20,30,40,50,60,70, 30], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
-loli_reverse = Way(4, [10,20,30,40,10, 50, 60], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
+loli = Way(3, [10, 20, 30, 40, 50, 60, 70, 30], Dict("oneway" => false, "reverseway" => false, "name" => "loli"))
+loli_reverse = Way(4, [10, 20, 30, 40, 10, 50, 60], Dict("oneway" => false, "reverseway" => false, "name" => "loli"))
 
-stresstest_open = Way(5, [10, 20, 30, 40, 50, 60, 70, 50, 30, 80, 90], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
-stresstest_closed = Way(6, [10, 20, 30, 40, 20, 50, 60, 60, 70, 10], Dict("oneway"=>false, "reverseway"=>false, "name"=>"loli"))
+stresstest_open = Way(5, [10, 20, 30, 40, 50, 60, 70, 50, 30, 80, 90], Dict("oneway" => false, "reverseway" => false, "name" => "loli"))
+stresstest_closed = Way(6, [10, 20, 30, 40, 20, 50, 60, 60, 70, 10], Dict("oneway" => false, "reverseway" => false, "name" => "loli"))
 ShadowGraphs.decompose_way_to_primitives(ring)
 
 g_osm = graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)
 g = shadow_graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)
 
 begin
-    fig = draw(g, :vertices; figure_params=Dict(:location=>(52.904, -1.18), :zoom_start=>14))
+    fig = draw(g, :vertices; figure_params=Dict(:location => (52.904, -1.18), :zoom_start => 14))
     draw!(fig, g, :edges)
     draw!(fig, g, :edgegeom)
 end
@@ -241,18 +273,18 @@ ShadowGraphs.add_this_node(g_osm, 323203074)
 
 
 a = try
-    a = [1,2,3][6]
+    a = [1, 2, 3][6]
 catch
 end
 a
 
 
 fig = draw(g, :vertices;
-        figure_params=Dict(:location=>(52.904, -1.18), :zoom_start=>14),
-        radius=3,
-        color=:red)
-    draw!(fig, g, :edges; color=:red, opacity=0.5, weight=5)
-    draw!(fig, g, :edgegeom, opacity=0.5, weight=5)
+    figure_params=Dict(:location => (52.904, -1.18), :zoom_start => 14),
+    radius=3,
+    color=:red)
+draw!(fig, g, :edges; color=:red, opacity=0.5, weight=5)
+draw!(fig, g, :edgegeom, opacity=0.5, weight=5)
 
 
 go = graph_from_file("rings.json", network_type=:bike)
