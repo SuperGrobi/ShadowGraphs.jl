@@ -7,6 +7,9 @@
 
 this package will contain (contains) code related to parsing, creating and working with OSM Networks in the context of the CoolWalks project.
 
+# WARNING: At the moment, all the things in here are probably... 70% correct.
+This needs some cleanup. Whenever you read something here and it does not seem to be right... It probably isn't. I am to blame. It is not you.
+
 ## User Interface
 Currently, there are three user facing methods for loading/importing/parsing data to a shadow graph (currently a MetaDiGraph instance):
 
