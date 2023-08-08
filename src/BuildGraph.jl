@@ -411,7 +411,11 @@ function shadow_graph_from_light_osm_graph(g)
     osm_ids = collect(keys(osm_id_to_nav_id))
 
     rot_dir = 0.0
-    @showprogress 1 "rebuilding topology wayfirst" for (way_id, way) in g.ways
+
+    pbar = ProgressBar(g.ways, printing_delay=1.0)
+    set_description(pbar, "simplifying topology")
+
+    for (way_id, way) in pbar
         primitive_ways = decompose_way_to_primitives(way)
 
         # define possible directions in which we are allowed to step through the way
@@ -422,11 +426,11 @@ function shadow_graph_from_light_osm_graph(g)
         end
 
         for primitive_way in primitive_ways
-            # find all nodes linked by this way
+            rot_dir += sum(dir -> get_rotational_direction(primitive_way, g.nodes, dir), step_directions)
+            # find all nodes linked by this way, as well as the nodes between them
             edgegeoms_as_nodes = get_all_node_lists(primitive_way, osm_ids)
 
             for edgegeom_as_nodes in edgegeoms_as_nodes, step_direction in step_directions
-                rot_dir += get_rotational_direction(primitive_way, g.nodes, step_direction)
 
                 # reverse if stepped in other direction
                 edgegeom_as_nodes = step_direction == 1 ? edgegeom_as_nodes : reverse(edgegeom_as_nodes)

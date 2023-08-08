@@ -18,7 +18,7 @@ using BenchmarkTools
 @benchmark shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike)
 @benchmark shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike)
 
-gs = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
+gs = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike)
 
 
 
