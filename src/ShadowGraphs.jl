@@ -5,7 +5,10 @@ using LightXML
 using Graphs
 using MetaGraphs
 using Folium
+
 using ProgressMeter
+using ProgressBars
+
 using ArchGDAL
 using Statistics
 using DataFrames
@@ -13,6 +16,13 @@ using StatsBase
 using SpatialIndexing
 using GeoInterface
 using CSV
+
+# TODO: Rework BuildGraph
+# TODO: Rework Measures
+# TODO: Rework Persistence
+# TODO: Rework Plotting
+# TODO: Rework Projection
+# TODO: Rework this file
 
 const EdgeGeomType = Union{ArchGDAL.IGeometry{ArchGDAL.wkbLineString},ArchGDAL.IGeometry{ArchGDAL.wkbMultiLineString}}
 include("Projection.jl")
