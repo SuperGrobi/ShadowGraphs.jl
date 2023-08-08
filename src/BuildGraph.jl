@@ -125,6 +125,37 @@ checks if a `LightOSM.Way` way starts at the same node it ends.
 is_circular_way(way::Way) = way.nodes[1] == way.nodes[end]
 
 
+"""
+    add_this_node(g, osm_id)
+
+checks if the node with `osm_id` in graph `g` should be added to the shadow graph. Currently, we add a node if one of the following is true:
+- if the number of ways the node is part of is larger than 1
+- if the node is the end of a street, that is, if it has only one neighbour in `g`
+- if the node occurs more than once in the way it is part of, excluding the end point, if the way is circular
+"""
+function add_this_node(g, osm_id)
+    index = g.node_to_index[osm_id]
+    way_ids = g.node_to_way[osm_id]
+    # if the node is part of more than one way
+    if length(way_ids) > 1
+        return true
+        # if the node is the end of a street (has only one neighbour)
+    elseif is_end_node(g.graph, index)
+        return true
+        # if the node appears more than once in the nodes of a way
+        # (excluding duplicates caused by circularity)
+    else
+        way = g.ways[first(way_ids)]  # if there is more than one way, the first if would trigger
+        if is_circular_way(way)
+            ocurrences = count(==(osm_id), way.nodes[1:end-1])
+        else
+            ocurrences = count(==(osm_id), way.nodes)
+        end
+        ocurrences > 1 && (return true)
+    end
+    return false
+end
+
 # ######## SMALL HELPERS ##########
 """
     countall(numbers)
@@ -285,36 +316,7 @@ function add_edge_with_data!(g, s, d; data=Dict())
     end
 end
 
-"""
-    add_this_node(g, osm_id)
 
-checks if the node with `osm_id` in graph `g` should be added to the shadow graph. Churrently, we add a node if one of the following is true:
-- if the number of ways the node is part of is larger than 1
-- if the node is the end of a street, that is, if he has only one neighbour in `g`
-- if the node occurs more than once in the way it is part of, excluding the end point, if the way is circular
-"""
-function add_this_node(g, osm_id)
-    index = g.node_to_index[osm_id]
-    way_ids = g.node_to_way[osm_id]
-    # if the node is part of more than one way
-    if length(way_ids) > 1
-        return true
-        # if the node is the end of a street (has only one neighbour)
-    elseif is_end_node(g.graph, index)
-        return true
-        # if the node appears more than once in the nodes of a way
-        # (excluding duplicates caused by circularity)
-    else
-        way = g.ways[first(way_ids)]  # if there is more than one way, the first if would trigger
-        if is_circular_way(way)
-            ocurrences = count(==(osm_id), way.nodes[1:end-1])
-        else
-            ocurrences = count(==(osm_id), way.nodes)
-        end
-        ocurrences > 1 && (return true)
-    end
-    return false
-end
 
 
 """
@@ -412,23 +414,26 @@ the props '[:osm_id, :tags, :edgegeom_base, :parsing_direction, :helper] are con
 (Editing them might cause strange behaviour. Always duplicate the `:edgegeom_base` with `ArchGDAL.clone`)
 """
 function shadow_graph_from_light_osm_graph(g)
-    # make the streets nodes are a part contain only unique elements
+    @info "rework called!"
+    # remove duplicate ways from node to way mapping (not sure if this is needed...)
     g.node_to_way = Dict(key => unique(value) for (key, value) in g.node_to_way)
+
     # build clean graph containing only nodes for topologically relevant nodes
     g_nav = MetaDiGraph()
     defaultweight!(g_nav, 0.0)
     weightfield!(g_nav, :full_length)
+
     # add only those nodes, which are relevant for topology
     for (osm_id, way_ids) in g.node_to_way
         if add_this_node(g, osm_id)
-            lat_point = g.nodes[osm_id].location.lat
             lon_point = g.nodes[osm_id].location.lon
+            lat_point = g.nodes[osm_id].location.lat
             point = ArchGDAL.createpoint(lon_point, lat_point)
             apply_wsg_84!(point)
             data = Dict(
                 :(osm_id) => osm_id,
-                :lat => lat_point,
                 :lon => lon_point,
+                :lat => lat_point,
                 :pointgeom => point,
                 :helper => false
             )
@@ -465,18 +470,12 @@ function shadow_graph_from_light_osm_graph(g)
                     nodelist_start_destination === nothing && continue
                     linestring = geolinestring(g.nodes, nodelist_start_destination)
 
-                    # project local to get length in meters
-                    p = ArchGDAL.pointalongline(linestring, 0.5 * ArchGDAL.geomlength(linestring))
-                    project_local!([linestring], ArchGDAL.getx(p, 0), ArchGDAL.gety(p, 0))
-                    projected_length = ArchGDAL.geomlength(linestring)
-                    project_back!([linestring])
-
                     data = Dict(
                         :osm_id => simple_way.id,
                         :tags => simple_way.tags,
                         :edgegeom => linestring,
                         :edgegeom_base => ArchGDAL.clone(linestring),
-                        :full_length => projected_length,
+                        :full_length => 0.0,
                         :parsing_direction => step,
                         :helper => false
                     )
@@ -485,6 +484,20 @@ function shadow_graph_from_light_osm_graph(g)
             end
         end
     end
+
+    # calculate center of the network and observatory
+    vertex_extent = geoiter_extent(get_prop(g_nav, v, :pointgeom) for v in vertices(g_nav))
+    vertex_extent_center = extent_center(vertex_extent)
+    obs = ShadowObservatory("ShadowGraphObservatory", vertex_extent_center.X, vertex_extent_center.Y, tz"Europe/Berlin")
+
+    # set full length in local coordinates
+    project_local!((get_prop(g_nav, e, :edgegeom) for e in filter_edges(g_nav, :helper, false)), obs)
+    for e in filter_edges(g_nav, :helper, false)
+        projected_length = ArchGDAL.geomlength(get_prop(g_nav, e, :edgegeom))
+        set_prop!(g_nav, e, :full_length, projected_length)
+    end
+    project_back!(get_prop(g_nav, e, :edgegeom) for e in filter_edges(g_nav, :helper, false))
+
 
     rot_dir == 0 && @warn "not rotational direction could be found. choosing right hand side driving."
     if rot_dir >= 0
@@ -498,17 +511,12 @@ function shadow_graph_from_light_osm_graph(g)
     # apply all graph level metadata
     set_prop!(g_nav, :crs, OSM_ref[])
     set_prop!(g_nav, :offset_dir, rot_dir)
-
-    vertex_extent = geoiter_extent(get_prop(g_nav, v, :pointgeom) for v in vertices(g_nav))
-    vertex_extent_center = extent_center(vertex_extent)
-    obs = ShadowObservatory("ShadowGraphObservatory", vertex_extent_center.X, vertex_extent_center.Y, tz"Europe/Berlin")
     set_prop!(g_nav, :observatory, obs)
+
 
     check_shadow_graph_integrity(g_nav)
     return g_nav
 end
-
-
 
 
 # ########### preprocessing of osm_data_object ####################

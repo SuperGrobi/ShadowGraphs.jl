@@ -14,9 +14,16 @@ using Folium
 using CoolWalksUtils
 
 g_shadow = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
+g_shadow_large = shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike);
+g_light = graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
 
 
+
+# @profview shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike);
 @profview shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
+
+
+shadow_graph_from_file("test_nottingham_bike.json"; network_type=:bike);
 
 g_shadow
 
