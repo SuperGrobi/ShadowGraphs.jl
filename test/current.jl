@@ -15,6 +15,15 @@ using CoolWalksUtils
 
 g_shadow = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
 
+
+@profview shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
+
+g_shadow
+
+
+a, b = geoiter_extent(get_prop(g_shadow, v, :pointgeom) for v in vertices(g_shadow))
+a
+
 g_shadow
 
 bearings, lengths = edge_bearings(g_shadow)

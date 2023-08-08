@@ -1,8 +1,9 @@
+# ###### Unopinionated parsers for the LightOSM data ##########
 """
     width(tags)
 
 less opinionated version of the basic parsing `LightOSM` does, to parse the `width` tag of an osm way.
-Returns the parsed width if the tag exists or `missing` if not.If Values are negative, we take the absolute value.
+Returns the parsed width if the tag exists or `missing` if not. If Values are negative, we take the absolute value.
 """
 function width(tags)
     width = get(tags, "width", missing)
@@ -96,7 +97,7 @@ function parse_raw_ways(raw_ways, network_type)
     return ways
 end
 
-
+# ######### predicates ########
 """
     is_end_node(g, index)
 
@@ -116,7 +117,118 @@ function is_end_node(g, index)
     end
 end
 
+"""
+    is_circular_way(way::Way)
 
+checks if a `LightOSM.Way` way starts at the same node it ends.
+"""
+is_circular_way(way::Way) = way.nodes[1] == way.nodes[end]
+
+
+# ######## SMALL HELPERS ##########
+"""
+    countall(numbers)
+
+counts how often every number appears in numbers. Returns dict with `number=>count`
+"""
+countall(numbers) = Dict(number => count(==(number), numbers) for number in unique(numbers))
+
+"""
+    get_rotational_direction(way::Way, nodes, direction)
+
+calculates the direction of rotation of the way if walked through in the direction of `direction` (either 1 or -1).
+Since the node locations are stored seperately, you have to pass in a dict `node_id=>LightOSM.Node` into `nodes`. Used only on simplified ways.
+
+# Returns
+- `1` if the rotation is righthanded
+- `-1` if the rotation is lefthanded
+- `0` if the way is not closed
+"""
+function get_rotational_direction(way::Way, nodes, direction)
+    !is_circular_way(way) && return 0  # non rings do not rotate
+    node_ids = way.nodes
+    points = [nodes[node_id].location for node_id in node_ids[1:end-1]]
+    x = [i.lon for i in points]
+    y = [i.lat for i in points]
+    min_x_ind = findall(e -> e == minimum(x), x)
+
+    min_y_options = y[min_x_ind]
+    y_ind = argmin(min_y_options)
+    ind = min_x_ind[y_ind]
+
+    x_b = x[ind]
+    y_b = y[ind]
+    ind_low = mod1(ind - 1, length(points))
+    x_a = x[ind_low]
+    y_a = y[ind_low]
+    ind_high = mod1(ind + 1, length(points))
+    x_c = x[ind_high]
+    y_c = y[ind_high]
+
+    det = (x_b - x_a) * (y_c - y_a) - (x_c - x_a) * (y_b - y_a)
+    if det > 0
+        return 1 * direction
+    elseif det < 0
+        return -1 * direction
+    else
+        return 0
+    end
+end
+
+# ######## DECOMPOSITION AND GEOMETRY CONSTRUCTION ########
+"""
+    decompose_way_to_primitives(way::Way)
+
+Decomposed a `way` with possible self-intersections/loops into multiple ways which are guaranteed to be either
+- non-intersecting lines, where every node in the way is unique, or
+- circular ways, where only the first and last node in the way are not unique.
+
+# example
+a simple `way` with nodes `[10,20,30,40,50,30]` (which looks like a triangle on a stick, not the repeated `30`) will
+be decomposed into two ways, with the nodes `[10,20,30]` and `[30,40,50,30]`.
+"""
+function decompose_way_to_primitives(way::Way)
+    length(way.nodes) <= 1 && throw(ArgumentError("there are less than two nodes in way $(way.id)"))
+    nodecounts = countall(way.nodes)
+    duplicate_nodes = filter(x -> x.second > 1, nodecounts)
+    cut_locations = findall(n -> n ∈ keys(duplicate_nodes), way.nodes)
+
+    # if nowhere to cut (straight line) or if ring without intersection
+    if length(cut_locations) == 0 || cut_locations == [1, length(way.nodes)]
+        return [way]
+    end
+
+    # from here on, cut_locations is at least one element long
+    if cut_locations[1] != 1
+        cut_locations = [1; cut_locations]
+    end
+    if cut_locations[end] != length(way.nodes)
+        push!(cut_locations, length(way.nodes))
+    end
+    # from here, there are at least three cut locations, including start and end point
+    sub_nodes = [way.nodes[s:d] for (s, d) in zip(cut_locations[1:end-1], cut_locations[2:end])]
+    if is_circular_way(way)
+        sub_nodes = [sub_nodes[2:end-1]; [[sub_nodes[end]; sub_nodes[1][2:end]]]]
+    end
+    return [Way(way.id, nodes, way.tags) for nodes in sub_nodes]
+end
+
+"""
+    geolinestring(nodes, node_id_list)
+
+creates an `ArchGDAL linestring` from a dictionary mapping osm node ids to `LightOSM.Node` and a list of osm node ids,
+representing the nodes of the linestring in order.
+"""
+function geolinestring(nodes, node_id_list)
+    nodelist = [nodes[id] for id in node_id_list]
+    location_tuples = [(node.location.lon, node.location.lat) for node in nodelist]
+    linestring = ArchGDAL.createlinestring(location_tuples)
+    apply_wsg_84!(linestring)
+    return linestring
+end
+
+
+# ############## INCREMENTAL ADDITION OF EDGES AND NODES ##################
 """
     add_edge_with_data!(g, s, d; data=Dict())
 
@@ -173,123 +285,7 @@ function add_edge_with_data!(g, s, d; data=Dict())
     end
 end
 
-
 """
-    is_circular_way(way::Way)
-
-checks if a `LightOSM.Way` way starts at the same node it ends.
-"""
-is_circular_way(way::Way) = way.nodes[1] == way.nodes[end]
-
-
-"""
-    countall(numbers)
-
-counts how often every number appears in numbers. Returns dict with `number=>count`
-"""
-countall(numbers) = Dict(number => count(==(number), numbers) for number in unique(numbers))
-
-
-"""
-
-    decompose_way_to_primitives(way::Way)
-
-Decomposed a `way` with possible self-intersections/loops into multiple ways which are guaranteed to be either
-- non-intersecting lines, where every node in the way is unique, or
-- circular ways, where only the first and last node in the way are not unique.
-
-# example
-a simple `way` with nodes `[10,20,30,40,50,30]` (which looks like a triangle on a stick, not the repeated `30`) will
-be decomposed into two ways, with the nodes `[10,20,30]` and `[30,40,50,30]`.
-"""
-function decompose_way_to_primitives(way::Way)
-    length(way.nodes) <= 1 && throw(ArgumentError("there are less than two nodes in way $(way.id)"))
-    nodecounts = countall(way.nodes)
-    duplicate_nodes = filter(x -> x.second > 1, nodecounts)
-    cut_locations = findall(n -> n ∈ keys(duplicate_nodes), way.nodes)
-
-    # if nowhere to cut (straight line) or if ring without intersection
-    if length(cut_locations) == 0 || cut_locations == [1, length(way.nodes)]
-        return [way]
-    end
-
-    # from here on, cut_locations is at least one element long
-    if cut_locations[1] != 1
-        cut_locations = [1; cut_locations]
-    end
-    if cut_locations[end] != length(way.nodes)
-        push!(cut_locations, length(way.nodes))
-    end
-    # from here, there are at least three cut locations, including start and end point
-    sub_nodes = [way.nodes[s:d] for (s, d) in zip(cut_locations[1:end-1], cut_locations[2:end])]
-    if is_circular_way(way)
-        sub_nodes = [sub_nodes[2:end-1]; [[sub_nodes[end]; sub_nodes[1][2:end]]]]
-    end
-    return [Way(way.id, nodes, way.tags) for nodes in sub_nodes]
-end
-
-
-"""
-    geolinestring(nodes, node_id_list)
-
-creates an `ArchGDAL linestring` from a dictionary mapping osm node ids to `LightOSM.Node` and a list of osm node ids,
-representing the nodes of the linestring in order.
-"""
-function geolinestring(nodes, node_id_list)
-    nodelist = [nodes[id] for id in node_id_list]
-    location_tuples = [(node.location.lon, node.location.lat) for node in nodelist]
-    linestring = ArchGDAL.createlinestring(location_tuples)
-    apply_wsg_84!(linestring)
-    return linestring
-end
-
-
-"""
-
-    get_rotational_direction(way::Way, nodes, direction)
-
-calculates the direction of rotation of the way if walked through in the direction of `direction` (either 1 or -1).
-Since the node locations are stored seperately, you have to pass in a dict `node_id=>LightOSM.Node` seperately. Used only on simplified ways.
-
-# Returns
-- `1` if the rotation is righthanded
-- `-1` if the rotation is lefthanded
-- `0` if the way is not closed
-"""
-function get_rotational_direction(way::Way, nodes, direction)
-    !is_circular_way(way) && return 0  # non rings do not rotate
-    node_ids = way.nodes
-    points = [nodes[node_id].location for node_id in node_ids[1:end-1]]
-    x = [i.lon for i in points]
-    y = [i.lat for i in points]
-    min_x_ind = findall(e -> e == minimum(x), x)
-
-    min_y_options = y[min_x_ind]
-    y_ind = argmin(min_y_options)
-    ind = min_x_ind[y_ind]
-
-    x_b = x[ind]
-    y_b = y[ind]
-    ind_low = mod1(ind - 1, length(points))
-    x_a = x[ind_low]
-    y_a = y[ind_low]
-    ind_high = mod1(ind + 1, length(points))
-    x_c = x[ind_high]
-    y_c = y[ind_high]
-
-    det = (x_b - x_a) * (y_c - y_a) - (x_c - x_a) * (y_b - y_a)
-    if det > 0
-        return 1 * direction
-    elseif det < 0
-        return -1 * direction
-    else
-        return 0
-    end
-end
-
-
-"""
-
     add_this_node(g, osm_id)
 
 checks if the node with `osm_id` in graph `g` should be added to the shadow graph. Churrently, we add a node if one of the following is true:
@@ -322,7 +318,6 @@ end
 
 
 """
-
     get_node_list(simple_way, start_osm_id, topological_nodes, direction) 
 
 tries to get list of osm ids in `simple_way` between the start_osm_id and the next topologically relevant node in direction of `direction`.
@@ -380,7 +375,7 @@ function get_node_list(simple_way, start_osm_id, topological_nodes, direction)
     end
 end
 
-
+# ############# main entry point for graph construction ############## 
 """
     shadow_graph_from_light_osm_graph(g)
 
@@ -500,23 +495,39 @@ function shadow_graph_from_light_osm_graph(g)
         rot_dir = -1
     end
 
+    # apply all graph level metadata
     set_prop!(g_nav, :crs, OSM_ref[])
     set_prop!(g_nav, :offset_dir, rot_dir)
-    g_lon, g_lat = center_BoundingBox(BoundingBox(get_prop(g_nav, v, :pointgeom) for v in vertices(g_nav)))
-    set_prop!(g_nav, :center_lon, g_lon)
-    set_prop!(g_nav, :center_lat, g_lat)
+
+    vertex_extent = geoiter_extent(get_prop(g_nav, v, :pointgeom) for v in vertices(g_nav))
+    vertex_extent_center = extent_center(vertex_extent)
+    obs = ShadowObservatory("ShadowGraphObservatory", vertex_extent_center.X, vertex_extent_center.Y, tz"Europe/Berlin")
+    set_prop!(g_nav, :observatory, obs)
+
+    check_shadow_graph_integrity(g_nav)
     return g_nav
 end
 
+
+
+
+# ########### preprocessing of osm_data_object ####################
 get_raw_ways(osm_json_object::AbstractDict) = LightOSM.osm_dict_from_json(osm_json_object)["way"]
 get_raw_ways(osm_xml_object::XMLDocument) = LightOSM.osm_dict_from_xml(osm_xml_object)["way"]
+
 
 """
     shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict}; network_type::Symbol=:drive)
 
 builds the shadow graph from an object holding the raw OSM data. This function is using the `graph_from_object`
-function from `LightOSM` to first build a `LightOSM.OSMGraph` object which then gets augmented with the custom parsed
-ways, before it gets handed over to the `shadow_graph_from_light_osm_graph` function.
+function from `LightOSM` to first build a `LightOSM.OSMGraph` object which, due to the opinionated parsing of tags
+in `LightOSM` holds some made up values in the `ways` field for non-existing tags.
+
+In this function, we replace these opinionated values with the ways we get from `ShadowGraphs.parse_raw_ways`.
+The main difference compared to `LightOSM` is, that we set every tag we expect from a street, but not get to `missing`,
+instead of assuming some value.
+
+The in this way augmented graph gets then handed over to [`shadow_graph_from_light_osm_graph`](@ref).
 
 # arguments
 - osm_data_object
@@ -541,11 +552,12 @@ function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict}; netw
     return shadow_graph_from_light_osm_graph(g)
 end
 
+# ########## main API for creating a shadow graph ################
 """
     shadow_graph_from_file(file_path::String; network_type::Symbol=:drive)
 
 builds the shadow graph from a file containing OSM data. The file could have been downloaded with
-either `shadow_graph_from_download` or `download_osm_network`.
+either `shadow_graph_from_download` or `LightOSM.download_osm_network`.
 
 # arguments
 - file_path: path to file. either `.osm`, `.xml` or `.json`
@@ -553,6 +565,7 @@ either `shadow_graph_from_download` or `download_osm_network`.
 `:drive`, `:drive_service`, `:walk`, `:bike`, `:all`, `:all_private`, `:none`, `:rail`
 """
 function shadow_graph_from_file(file_path::String; network_type::Symbol=:drive)
+
     !isfile(file_path) && throw(ArgumentError("File $file_path does not exist"))
     deserializer = LightOSM.file_deserializer(file_path)
     obj = deserializer(file_path)
@@ -571,7 +584,7 @@ end
 downloads and builds the shadow graph from OSM.
 
 # arguments
-- `download_method::Symbol`: Download method, choose from `:place_name`, `:bbox` or `:point`.
+- `download_method::Symbol`: Download method, choose from `:place_name`, `:bbox`, `:point`, `:polygon` and (added by this package) `:extent`.
 - `network_type::Symbol=:drive`: Network type filter, pick from `:drive`, `:drive_service`, `:walk`, `:bike`, `:all`, `:all_private`, `:none`, `:rail`
 - `metadata::Bool=false`: Set true to return metadata.
 - `download_format::Symbol=:json`: Download format, either `:osm`, `:xml` or `json`.
@@ -595,6 +608,9 @@ downloads and builds the shadow graph from OSM.
 *`download_method=:polygon`*
 - `polygon::AbstractVector`: Vector of longitude-latitude pairs.
 
+* `download_method=:extent`*
+- `extent::Extents.Extent`: Extent holding the bounding box for the download. Follows the `GeoInterface` convention (for example `extent=Extent(X=(minlon, maxlon), Y=(minlat, maxlat))`)
+
 # Network Types
 - `:drive`: Motorways excluding private and service ways.
 - `:drive_service`: Motorways including private and service ways.
@@ -614,11 +630,20 @@ function shadow_graph_from_download(download_method::Symbol;
     download_format::Symbol=:json,
     save_to_file_location::Union{String,Nothing}=nothing,
     download_kwargs...)
+
+    # patching the extent download_method onto LightOSM
+    if download_method == :extent
+        download_method = :bbox
+        ex = download_kwargs[:extent]
+        (minlon=ex.X[1], maxlon=ex.X[2], minlat=ex.Y[1], maxlat=ex.Y[2])
+    end
+
     obj = download_osm_network(download_method,
         network_type=network_type,
         metadata=metadata,
         download_format=download_format,
         save_to_file_location=save_to_file_location;
         download_kwargs...)
+
     return shadow_graph_from_object(obj; network_type=network_type)
 end
