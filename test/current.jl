@@ -13,13 +13,45 @@ using Colors
 using Folium
 using CoolWalksUtils
 
+using BenchmarkTools
+
+@benchmark shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike)
+@benchmark shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike)
+
+gs = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
+
+
+
 g_shadow = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
-g_shadow_large = shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike);
+g_s1 = shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike);
+g_s2 = shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike);
+
+g_s1[2]
+g_s2[2]
+
+tag = :full_length
+for e in filter_edges(g_s2[2], tag)
+    p1 = get_prop(g_s1[2], e, tag)
+    p2 = get_prop(g_s2[2], e, tag) 
+    if p1 != p2
+        @warn p1 p2 e
+        break
+    end
+end
+
+e = Edge(32, 3034)
+
+a2 = sum(filter_edges(g_s2[2], :full_length)) do e
+    get_prop(g_s2[2], e, :full_length)
+end
+
+a1-a2
+
 g_light = graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
 
 
 
-# @profview shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike);
+@profview shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike);
 @profview shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
 
 

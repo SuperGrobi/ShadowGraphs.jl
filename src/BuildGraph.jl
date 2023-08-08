@@ -215,7 +215,7 @@ Decomposed a `way` with possible self-intersections/loops into multiple ways whi
 - circular ways, where only the first and last node in the way are not unique.
 
 # example
-a simple `way` with nodes `[10,20,30,40,50,30]` (which looks like a triangle on a stick, not the repeated `30`) will
+a `way` with nodes `[10,20,30,40,50,30]` (which looks like a triangle on a stick, note the repeated `30`) will
 be decomposed into two ways, with the nodes `[10,20,30]` and `[30,40,50,30]`.
 """
 function decompose_way_to_primitives(way::Way)
@@ -259,7 +259,7 @@ function geolinestring(nodes, node_id_list)
 end
 
 
-# ############## INCREMENTAL ADDITION OF EDGES AND NODES ##################
+# ############## INCREMENTAL ADDITION OF EDGES ##################
 """
     add_edge_with_data!(g, s, d; data=Dict())
 
@@ -317,64 +317,31 @@ function add_edge_with_data!(g, s, d; data=Dict())
 end
 
 
-
-
 """
-    get_node_list(simple_way, start_osm_id, topological_nodes, direction) 
+    get_all_node_lists(primitive_way, topological_osm_ids)
 
-tries to get list of osm ids in `simple_way` between the start_osm_id and the next topologically relevant node in direction of `direction`.
-Returns either `Int[]` or `nothing` if there is no relevant node in direction of `direction`.
+get vector of vectors where each element contains the `osm_ids` between two topologically relevant nodes,
+in the same order as they occur in primitive way. Takes care of cyclical ways.
 
-Used only on simplified ways.
+Only use on primitive ways.
 """
-function get_node_list(simple_way, start_osm_id, topological_nodes, direction)
-    direction ∉ [-1, 1] && throw(ArgumentError("direction $direction not allowed"))
+function get_all_node_lists(primitive_way, topological_osm_ids)
+    all_nodes = is_circular_way(primitive_way) ? primitive_way.nodes[1:end-1] : primitive_way.nodes
 
-    all_nodes = simple_way.nodes
+    @assert allunique(all_nodes) "somehow there are duplicates in the primitive way."
 
-    start_osm_id ∉ all_nodes && throw(ArgumentError("start_osm_id $start_osm_id not in way.nodes: $all_nodes"))
-    start_osm_id ∉ topological_nodes && throw(ArgumentError("start_osm_id $start_osm_id not in topological_nodes: $topological_nodes"))
-    any([n ∉ all_nodes for n in topological_nodes]) && throw(ArgumentError("not all topological nodes ($topological_nodes) are in the original way ($all_nodes)!"))
+    linked_topological_nodes = [node for node in all_nodes if node in topological_osm_ids]
+    topo_inds_in_all = [findfirst(==(i), all_nodes) for i in linked_topological_nodes]
+    all_edges_as_nodes = [all_nodes[a:b] for (a, b) in partition(topo_inds_in_all, 2, 1)]
 
-    large_counts = filter(p -> p.second > 1, countall(all_nodes))
-    length(large_counts) > 1 && throw(ArgumentError("You input a non simple way (nodes: $all_nodes)"))
-
-    if length(large_counts) == 1
-        prob_node = first(first(large_counts))
-        if !(prob_node == all_nodes[1] && prob_node == all_nodes[end])
-            throw(ArgumentError("You input a non simple, non cyclic way (nodes: $all_nodes)"))
-        end
+    if is_circular_way(primitive_way)
+        closing_inds_1 = topo_inds_in_all[end]:length(all_nodes)
+        closing_inds_2 = 1:topo_inds_in_all[1]
+        closing_edge = all_nodes[[closing_inds_1; closing_inds_2]]
+        push!(all_edges_as_nodes, closing_edge)
     end
 
-    # get index of start node in full and in reduced nodes list
-    all_start_index = direction == 1 ? findfirst(==(start_osm_id), all_nodes) : findlast(==(start_osm_id), all_nodes)
-    topological_start_index = direction == 1 ? findfirst(==(start_osm_id), topological_nodes) : findlast(==(start_osm_id), topological_nodes)
-    topological_destination_index = topological_start_index + direction
-
-    # in every simple way, at most the the start and end node are the same
-    if is_circular_way(simple_way) # start and end node are the same
-        destination_osm_id = topological_nodes[mod1(topological_destination_index, length(topological_nodes))]
-        all_destination_index = direction == -1 ? findfirst(==(destination_osm_id), all_nodes) : findlast(==(destination_osm_id), all_nodes)
-        # correct destination due to periodic boundary
-        if direction == 1 && all_start_index >= all_destination_index
-            all_destination_index += length(all_nodes)
-        elseif direction == -1 && all_start_index <= all_destination_index
-            all_start_index += length(all_nodes)
-        end
-        indices = mod1.(all_start_index:direction:all_destination_index, length(all_nodes))
-
-        nodelist_inbetween = all_nodes[mod1.(all_start_index:direction:all_destination_index, length(all_nodes))]
-        return rle(nodelist_inbetween)[1]
-    else # everything is unique, nothing is periodic
-        try
-            destination_osm_id = topological_nodes[topological_start_index+direction]
-            all_destination_index = findfirst(==(destination_osm_id), all_nodes)
-            nodelist_inbetween = all_nodes[all_start_index:direction:all_destination_index]
-            return nodelist_inbetween
-        catch e
-            e isa BoundsError ? (return nothing) : rethrow(e)
-        end
-    end
+    return all_edges_as_nodes
 end
 
 # ############# main entry point for graph construction ############## 
@@ -414,7 +381,6 @@ the props '[:osm_id, :tags, :edgegeom_base, :parsing_direction, :helper] are con
 (Editing them might cause strange behaviour. Always duplicate the `:edgegeom_base` with `ArchGDAL.clone`)
 """
 function shadow_graph_from_light_osm_graph(g)
-    @info "rework called!"
     # remove duplicate ways from node to way mapping (not sure if this is needed...)
     g.node_to_way = Dict(key => unique(value) for (key, value) in g.node_to_way)
 
@@ -431,7 +397,7 @@ function shadow_graph_from_light_osm_graph(g)
             point = ArchGDAL.createpoint(lon_point, lat_point)
             apply_wsg_84!(point)
             data = Dict(
-                :(osm_id) => osm_id,
+                :osm_id => osm_id,
                 :lon => lon_point,
                 :lat => lat_point,
                 :pointgeom => point,
@@ -444,43 +410,42 @@ function shadow_graph_from_light_osm_graph(g)
     osm_id_to_nav_id = Dict(get_prop(g_nav, i, :osm_id) => i for i in vertices(g_nav))
     osm_ids = collect(keys(osm_id_to_nav_id))
 
-    rot_dir = 0
-    @showprogress 1 "rebuilding topology" for start_node_id in vertices(g_nav)
-        # get ways this node is part of
-        start_osm_id = get_prop(g_nav, start_node_id, :osm_id)
-        ways = [g.ways[way_id] for way_id in g.node_to_way[start_osm_id]]
-        for way in ways
-            # decompose way and filter to only include the ones in which the start node is contained
-            simple_ways = filter(simple_way -> start_osm_id ∈ simple_way.nodes, decompose_way_to_primitives(way))
-            for simple_way in simple_ways
-                # define possible directions in which we are allowed to step through the way
-                if simple_way.tags["oneway"]
-                    step_directions = simple_way.tags["reverseway"] ? [-1] : [1]
-                else
-                    step_directions = [-1, 1]
-                end
+    rot_dir = 0.0
+    @showprogress 1 "rebuilding topology wayfirst" for (way_id, way) in g.ways
+        primitive_ways = decompose_way_to_primitives(way)
 
-                all_nodes = simple_way.nodes
-                topological_nodes = [node for node in all_nodes if node in osm_ids]
+        # define possible directions in which we are allowed to step through the way
+        if way.tags["oneway"]
+            step_directions = way.tags["reverseway"] ? [-1] : [1]
+        else
+            step_directions = [-1, 1]
+        end
 
-                for step in step_directions
-                    rot_dir += get_rotational_direction(simple_way, g.nodes, step)
+        for primitive_way in primitive_ways
+            # find all nodes linked by this way
+            edgegeoms_as_nodes = get_all_node_lists(primitive_way, osm_ids)
 
-                    nodelist_start_destination = get_node_list(simple_way, start_osm_id, topological_nodes, step)
-                    nodelist_start_destination === nothing && continue
-                    linestring = geolinestring(g.nodes, nodelist_start_destination)
+            for edgegeom_as_nodes in edgegeoms_as_nodes, step_direction in step_directions
+                rot_dir += get_rotational_direction(primitive_way, g.nodes, step_direction)
 
-                    data = Dict(
-                        :osm_id => simple_way.id,
-                        :tags => simple_way.tags,
-                        :edgegeom => linestring,
-                        :edgegeom_base => ArchGDAL.clone(linestring),
-                        :full_length => 0.0,
-                        :parsing_direction => step,
-                        :helper => false
-                    )
-                    add_edge_with_data!(g_nav, start_node_id, osm_id_to_nav_id[nodelist_start_destination[end]]; data=data)
-                end
+                # reverse if stepped in other direction
+                edgegeom_as_nodes = step_direction == 1 ? edgegeom_as_nodes : reverse(edgegeom_as_nodes)
+
+                linestring = geolinestring(g.nodes, edgegeom_as_nodes)
+
+                data = Dict(
+                    :osm_id => primitive_way.id,
+                    :tags => primitive_way.tags,
+                    :edgegeom => linestring,
+                    :edgegeom_base => ArchGDAL.clone(linestring),
+                    :full_length => 0.0,
+                    :parsing_direction => step_direction,
+                    :helper => false
+                )
+
+                osm_src = edgegeom_as_nodes[1]
+                osm_dst = edgegeom_as_nodes[end]
+                add_edge_with_data!(g_nav, osm_id_to_nav_id[osm_src], osm_id_to_nav_id[osm_dst]; data=data)
             end
         end
     end
@@ -556,7 +521,6 @@ function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict}; netw
     for i in keys(g.ways)
         g.ways[i] = parsed_ways[i]
     end
-
     return shadow_graph_from_light_osm_graph(g)
 end
 
