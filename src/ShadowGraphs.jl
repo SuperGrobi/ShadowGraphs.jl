@@ -21,10 +21,9 @@ using TimeZones
 using IterTools
 
 
-# TODO: Rework BuildGraph
+# TODO: Rework Plotting
 # TODO: Rework Measures
 # TODO: Rework Persistence
-# TODO: Rework Plotting
 # TODO: Rework Projection
 # TODO: Rework this file
 
