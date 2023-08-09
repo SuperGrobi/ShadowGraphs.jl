@@ -21,7 +21,7 @@ you might observe strange behaviour when mutating the graph (as you will only ge
 
 ## graph level
 - `:sg_crs`: Coordinate system the graph is currently in. (Uses `ArchGDAL` coordinate systems.)
-- `:sg_offset_dir`: Direction in which the streets should be offset (see [`ShadowGraphs.correct_centerlines!`](@ref). Should be `+1` for right hand side driving and `-1` for left hand side driving.)
+- `:sg_offset_dir`: Direction in which the streets should be offset (Should be `+1` for right hand side driving and `-1` for left hand side driving.)
 - `:sg_observatory`: `CoolWalksUtils.ShadowObservatory` holding the center of the graph, for projection purposes. (Note that the timezone in the `tz` field is not used.)
 
 ## nodes

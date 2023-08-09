@@ -567,7 +567,7 @@ downloads and builds the shadow graph from OSM.
 *`download_method=:polygon`*
 - `polygon::AbstractVector`: Vector of longitude-latitude pairs.
 
-* `download_method=:extent`*
+*`download_method=:extent`*
 - `extent::Extents.Extent`: Extent holding the bounding box for the download. Follows the `GeoInterface` convention (for example `extent=Extent(X=(minlon, maxlon), Y=(minlat, maxlat))`)
 
 # Network Types
