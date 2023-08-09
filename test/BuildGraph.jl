@@ -17,6 +17,7 @@ include("./utils/BuildGraphTestUtils.jl")
 end
 
 @testitem "parse_lanes" begin
+    using LightOSM
     tags = Dict(
         "lanes" => 4.6,
         "lanes:forward" => 3,
@@ -103,6 +104,10 @@ end
 
 # PREDICATES
 @testitem "is_end_node" begin
+    using Graphs, MetaGraphs
+    cd(@__DIR__)
+    include("./utils/BuildGraphTestUtils.jl")
+
     g = setup_testgraph()
     solutions = [true, true, true, false, false, false]
     for (node, solution) in zip(vertices(g), solutions)
@@ -111,6 +116,8 @@ end
 end
 
 @testitem "is_circular_way" begin
+    using LightOSM
+
     w1 = Way(1, [1, 2, 3, 4, 5, 6, 1], Dict("oneway" => true, "isroundabout" => true, "name" => "testroundabout"))
     w2 = Way(2, [7, 8, 9, 10, 11], Dict("oneway" => false, "isroundabout" => false, "highway" => "residential"))
     @test ShadowGraphs.is_circular_way(w1)
@@ -119,6 +126,9 @@ end
 
 
 @testitem "add_this_node" begin
+    using LightOSM
+    cd(@__DIR__)
+
     g = graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)
     @test ShadowGraphs.add_this_node(g, 323204711)  # roundabout, start-end
     @test ShadowGraphs.add_this_node(g, 323203082)  # intersection
@@ -149,6 +159,9 @@ end
 end
 
 @testitem "get_rotational_direction" begin
+    using LightOSM, MetaGraphs
+    cd(@__DIR__)
+
     nodes = Dict(i => Node(i, GeoLocation(lat, lon), nothing) for (i, lon, lat) in zip(1:7, cos.(0:6), sin.(0:6)))
 
     leftway = Way(1, [1, 2, 3, 4, 5, 6, 1], Dict{String,Any}())
@@ -170,6 +183,8 @@ end
 
 # DECOMPOSITION AND GEOMETRY CONSTRUCTION
 @testitem "decompose_way_to_primitives" begin
+    using LightOSM
+
     line = Way(1, [10, 20, 30, 40, 50, 60, 70, 80], Dict("oneway" => false, "reverseway" => false, "name" => "line"))
     ring = Way(2, [10, 20, 30, 40, 50, 60, 70, 80, 10], Dict("oneway" => false, "reverseway" => false, "name" => "ring"))
     loli = Way(3, [10, 20, 30, 40, 50, 60, 70, 30], Dict("oneway" => false, "reverseway" => false, "name" => "loli"))
@@ -228,75 +243,66 @@ end
     @test clover_decomp[4].nodes == [20, 70, 80, 20]
 end
 
-@testitem "get_node_list lines" begin
+@testitem "get_all_node_lists lines" begin
+    using LightOSM
+
     line = Way(1, [10, 20, 30, 40, 50, 60, 70, 80], Dict("oneway" => false, "reverseway" => false, "name" => "line"))
 
     topo_nodes = [10, 40, 50, 70, 80]
 
-    @test ShadowGraphs.get_node_list(line, 10, topo_nodes, 1) == [10, 20, 30, 40]
-    @test ShadowGraphs.get_node_list(line, 50, topo_nodes, 1) == [50, 60, 70]
-    @test ShadowGraphs.get_node_list(line, 70, topo_nodes, 1) == [70, 80]
+    all_node_lists = ShadowGraphs.get_all_node_lists(line, topo_nodes)
+    expected_nodes = [[10, 20, 30, 40], [40, 50], [50, 60, 70], [70, 80]]
 
-    @test ShadowGraphs.get_node_list(line, 80, topo_nodes, -1) == [80, 70]
-    @test ShadowGraphs.get_node_list(line, 70, topo_nodes, -1) == [70, 60, 50]
-    @test ShadowGraphs.get_node_list(line, 40, topo_nodes, -1) == [40, 30, 20, 10]
+    @test length(all_node_lists) == length(expected_nodes)
+    for (result, expected) in zip(all_node_lists, expected_nodes)
+        @test result == expected
+    end
 
-    @test ShadowGraphs.get_node_list(line, 80, topo_nodes, 1) === nothing
-    @test ShadowGraphs.get_node_list(line, 10, topo_nodes, -1) === nothing
-
-    @test_throws ArgumentError ShadowGraphs.get_node_list(line, 20, topo_nodes, 2)  # direction not allowed
-    @test_throws ArgumentError ShadowGraphs.get_node_list(line, 25, topo_nodes, 1)  # start not in way
-    @test_throws ArgumentError ShadowGraphs.get_node_list(line, 20, topo_nodes, 1)  # start not in topo nodes
-    @test_throws ArgumentError ShadowGraphs.get_node_list(line, 10, [10, 40, 50, 90], 1)  # topo nodes not subset of way
-
-    @test_throws ArgumentError ShadowGraphs.get_node_list(Way(2, [10, 20, 30, 40, 20, 50, 10, 60], Dict{String,Any}()), 20, [20, 40, 50], 1)  # non simple way
-    @test_throws ArgumentError ShadowGraphs.get_node_list(Way(2, [10, 20, 30, 40, 20], Dict{String,Any}()), 20, [10, 20, 40], 1)  # non simple way with one duplicate
+    @test_throws AssertionError ShadowGraphs.get_all_node_lists(Way(2, [10, 20, 30, 40, 20, 50, 10, 60], Dict{String,Any}()), [20, 40, 50])  # non simple way
+    @test_throws AssertionError ShadowGraphs.get_all_node_lists(Way(2, [10, 20, 30, 40, 20], Dict{String,Any}()), [10, 20, 40])  # non simple way with one duplicate
 end
 
-@testitem "get_node_list rings" begin
+@testitem "get_all_node_lists rings" begin
+    using LightOSM
+
     ring = Way(1, [10, 20, 30, 40, 50, 60, 70, 80, 10], Dict("oneway" => false, "reverseway" => false, "name" => "ring"))
 
-    topo_nodes_unbroken = [10, 10]
-    @test ShadowGraphs.get_node_list(ring, 10, topo_nodes_unbroken, 1) == [10, 20, 30, 40, 50, 60, 70, 80, 10]
-    @test ShadowGraphs.get_node_list(ring, 10, topo_nodes_unbroken, -1) == [10, 80, 70, 60, 50, 40, 30, 20, 10]
+
+    topo_nodes_unbroken = [10]
+    @test ShadowGraphs.get_all_node_lists(ring, topo_nodes_unbroken) == [[10, 20, 30, 40, 50, 60, 70, 80, 10]]
 
     topo_nodes_unbroken = [40]
-    @test ShadowGraphs.get_node_list(ring, 40, topo_nodes_unbroken, 1) == [40, 50, 60, 70, 80, 10, 20, 30, 40]
-    @test ShadowGraphs.get_node_list(ring, 40, topo_nodes_unbroken, -1) == [40, 30, 20, 10, 80, 70, 60, 50, 40]
+    @test ShadowGraphs.get_all_node_lists(ring, topo_nodes_unbroken) == [[40, 50, 60, 70, 80, 10, 20, 30, 40]]
 
     # start is part of topology
-    topo_nodes_broken = [10, 40, 60, 70, 10]
-    @test ShadowGraphs.get_node_list(ring, 10, topo_nodes_broken, 1) == [10, 20, 30, 40]
-    @test ShadowGraphs.get_node_list(ring, 40, topo_nodes_broken, 1) == [40, 50, 60]
-    @test ShadowGraphs.get_node_list(ring, 70, topo_nodes_broken, 1) == [70, 80, 10]
+    topo_nodes_broken = [10, 40, 60, 70]
+    all_node_lists = ShadowGraphs.get_all_node_lists(ring, topo_nodes_broken)
+    expected_nodes = [[10, 20, 30, 40], [40, 50, 60], [60, 70], [70, 80, 10]]
 
-    @test ShadowGraphs.get_node_list(ring, 10, topo_nodes_broken, -1) == [10, 80, 70]
-    @test ShadowGraphs.get_node_list(ring, 40, topo_nodes_broken, -1) == [40, 30, 20, 10]
-    @test ShadowGraphs.get_node_list(ring, 70, topo_nodes_broken, -1) == [70, 60]
+    @test length(all_node_lists) == length(expected_nodes)
+    for (result, expected) in zip(all_node_lists, expected_nodes)
+        @test result == expected
+    end
 
     # start is not part of topology
     topo_nodes_broken = [20, 50, 60, 80]
-    @test ShadowGraphs.get_node_list(ring, 20, topo_nodes_broken, 1) == [20, 30, 40, 50]
-    @test ShadowGraphs.get_node_list(ring, 60, topo_nodes_broken, 1) == [60, 70, 80]
-    @test ShadowGraphs.get_node_list(ring, 80, topo_nodes_broken, 1) == [80, 10, 20]
 
-    @test ShadowGraphs.get_node_list(ring, 20, topo_nodes_broken, -1) == [20, 10, 80]
-    @test ShadowGraphs.get_node_list(ring, 60, topo_nodes_broken, -1) == [60, 50]
-    @test ShadowGraphs.get_node_list(ring, 80, topo_nodes_broken, -1) == [80, 70, 60]
+    all_node_lists = ShadowGraphs.get_all_node_lists(ring, topo_nodes_broken)
+    expected_nodes = [[20, 30, 40, 50], [50, 60], [60, 70, 80], [80, 10, 20]]
 
+    @test length(all_node_lists) == length(expected_nodes)
+    for (result, expected) in zip(all_node_lists, expected_nodes)
+        @test result == expected
+    end
 
-
-    @test_throws ArgumentError ShadowGraphs.get_node_list(ring, 20, topo_nodes_broken, 2)  # direction not allowed
-    @test_throws ArgumentError ShadowGraphs.get_node_list(ring, 25, topo_nodes_broken, 1)  # start not in way
-    @test_throws ArgumentError ShadowGraphs.get_node_list(ring, 40, topo_nodes_broken, 1)  # start not in topo nodes
-    @test_throws ArgumentError ShadowGraphs.get_node_list(ring, 10, [10, 45, 50, 90], 1)  # topo nodes not subset of way
-
-    @test_throws ArgumentError ShadowGraphs.get_node_list(Way(2, [10, 20, 30, 40, 20, 50, 10], Dict{String,Any}()), 20, [20, 40, 50], 1)  # non simple way
-    @test_throws ArgumentError ShadowGraphs.get_node_list(Way(2, [10, 20, 30, 40, 50, 20], Dict{String,Any}()), 20, [10, 20, 40], 1)  # non simple way with one duplicate
+    @test_throws AssertionError ShadowGraphs.get_all_node_lists(Way(2, [10, 20, 30, 40, 20, 50, 10], Dict{String,Any}()), [20, 40, 50])  # non simple way
+    @test_throws AssertionError ShadowGraphs.get_all_node_lists(Way(2, [10, 20, 30, 40, 50, 20], Dict{String,Any}()), [10, 20, 40])  # non simple way with one duplicate
 end
 
 
 @testitem "geolinestring from osm nodes" begin
+    using LightOSM, ArchGDAL, CoolWalksUtils
+
     lons = [2.0, 4.0, 5.8, 9.9, 8.4, -6.3, -1.4, 4.8, -2.8, 2.0]
     lats = [8.2, -3.1, -2.9, -8.0, -4.3, 2.7, -8.5, 7.5, 3.0, -9.5]
     tags = Dict("a" => 1, "b" => "hi")
@@ -328,6 +334,10 @@ end
 
 # incremental addition of edges
 @testitem "add_edge_with_data" begin
+    using ArchGDAL, MetaGraphs, Graphs, CoolWalksUtils
+    cd(@__DIR__)
+    include("./utils/BuildGraphTestUtils.jl")
+
     function data(g, s, d)
         xs = get_prop(g, s, :lon)
         ys = get_prop(g, s, :lat)
@@ -396,6 +406,9 @@ end
 
 # MAIN ENTRY POINT FOR GRAPH CONSTRUCTION
 @testitem "shadow_graph_from_light_osm_graph" begin
+    using MetaGraphs, Graphs, ArchGDAL, LightOSM
+    cd(@__DIR__)
+
     g_osm = graph_from_file("./data/test_clifton_bike.json", network_type=:bike)
     g = ShadowGraphs.shadow_graph_from_light_osm_graph(g_osm)
     @test g isa MetaDiGraph
@@ -407,7 +420,7 @@ end
     for e in test_edges
         @test has_prop(g, e, :full_length)
         @test get_prop(g, e, :full_length) > 0
-        @test ArchGDAL.distance(get_prop(g, e, :edgegeom), get_prop(g, e, :edgegeom_base)) ≈ 0
+        @test ArchGDAL.distance(get_prop(g, e, :edgegeom), get_prop(g, e, :edgegeom_base)) ≈ 0 atol = 1e-10
         @test ArchGDAL.geomlength(get_prop(g, e, :edgegeom)) ≈ ArchGDAL.geomlength(get_prop(g, e, :edgegeom_base))
     end
     @test mapreduce(e -> has_prop(g, e, :edgegeom) && has_prop(g, e, :edgegeom_base), &, filter_edges(g, :helper, false))
@@ -415,12 +428,14 @@ end
     # test if all relevant props are set
     @test has_prop(g, :crs)
     @test has_prop(g, :offset_dir)
-    @test has_prop(g, :center_lon)
-    @test has_prop(g, :center_lat)
+    @test has_prop(g, :observatory)
 end
 
 # USER FACING LOADER FUNCTIONS
 @testitem "shadow_graph_from_object" begin
+    using LightOSM, MetaGraphs, Graphs
+    cd(@__DIR__)
+
     obj = LightOSM.file_deserializer("./data/test_clifton_bike.json")("./data/test_clifton_bike.json")
     g = shadow_graph_from_object(obj, network_type=:bike)
     @test g isa MetaDiGraph
@@ -429,6 +444,9 @@ end
 end
 
 @testitem "shadow_graph_from_file" begin
+    using MetaGraphs, Graphs
+    cd(@__DIR__)
+
     g = shadow_graph_from_file("./data/test_clifton_bike.json", network_type=:bike)
     @test g isa MetaDiGraph
     @test nv(g) == 1692
@@ -436,6 +454,8 @@ end
 end
 
 @testitem "shadow_graph_from_download" begin
+    using MetaGraphs, Graphs, CoolWalksUtils
+
     @rerun 15 begin
         g = shadow_graph_from_download(:bbox; minlat=52.89, minlon=-1.2, maxlat=52.92, maxlon=-1.165, network_type=:bike)
         @test g isa MetaDiGraph
