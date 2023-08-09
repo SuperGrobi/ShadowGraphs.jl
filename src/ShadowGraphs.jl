@@ -21,7 +21,6 @@ using TimeZones
 using IterTools
 
 
-# TODO: Rework Plotting
 # TODO: Rework Measures
 # TODO: Rework Persistence
 # TODO: Rework Projection
