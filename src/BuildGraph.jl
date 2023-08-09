@@ -294,48 +294,48 @@ end
 
 adds new edge from `s` to `d` to `g::MetaDiGraph`, and populates it with the `props` given in `data`.
 
-`data` is expected to have at least a key `:edgegeom`, containing the geometry of the street between `s` and `d` as an `ArchGDAL linestring` in the WSG84
-system. (Use `apply_wsg_84!`)
+`data` is expected to have at least a key `:sg_street_geometry`, containing the geometry of the street between `s` and `d` as an `ArchGDAL linestring` in the WSG84
+system. (Use `CoolWalksUtils.apply_wsg_84!`)
 
 Special care is given to self and multi edges:
-- self edges: if `s==d`, actually two new vertices are added at 10% and 60% along the `:edgegeom`, with `props` of `:lat`, `:lon`, `pointgeom` and `:helper=true` set acordingly.
-These new vertices (`h1` and `h2`) are then connected to form a loop like: `s --he1--> h1 --real_edge--> h2 --he2--> d`,
-where `he1` and `he2` are helper edges with only one `prop` of `:helper=true`. `real_edge` is carrying all the `props` defined
-in `data`
-- multi edges: if `Edge(s,d) ∈ Edges(g)`, we add one new helper vertex at 50% along the `:edgegeom` with `props` of `:lat`, `:lon`, `pointgeom` and `:helper=true`.
-We connect to the graph like this: `s --he--> h --real_edge--> d`, where `he` is a helper edge with only one `prop`, `:helper=true`.
-`real_edge` carries all the `props` specified in `data`
+- self edges: if `s==d`, two new vertices are added at 10% and 60% along the `:sg_street_geometry`, with `props` of `:sg_lat`, `:sg_lon`, `sg_geometry` and `:sg_helper=true` set acordingly.
+These new vertices (`h1` and `h2`) are then connected to form a loop like: `s --helper_edge1--> h1 --real_edge--> h2 --helper_edge2--> d`,
+where `helper_edge1` and `helper_edge2` are helper edges with only one `prop` of `:sg_helper=true`. `real_edge` is carrying all the `props` defined
+in `data`.
+- multi edges: if `Edge(s,d) ∈ Edges(g)`, we add one new helper vertex at 50% along the `:sg_street_geometry` with `props` of `:sg_lat`, `:sg_lon`, `sg_geometry` and `:sg_helper=true`.
+We connect to the graph like this: `s --helper_edge--> h --real_edge--> d`, where `helper_edge` is a helper edge with only one `prop`, `:sg_helper=true`.
+`real_edge` carries all the `props` specified in `data`.
 
 This process is nessecary to preserve the street network topology, since `MetaDiGraph`s do not support multi edges (and therefore also no multi self edges).
 """
 function add_edge_with_data!(g, s, d; data=Dict())
-    !haskey(data, :edgegeom) && throw(KeyError("cant add edge, data has no key :edgegeom."))
+    !haskey(data, :sg_street_geometry) && throw(KeyError("cant add edge, data has no key :sg_street_geometry."))
 
     if s == d  # if we are about to add a self-loop
         #@warn "trying to add self loop for node $(get_prop(g, s, :osm_id)) ($s)"
-        geomlength = ArchGDAL.geomlength(data[:edgegeom])
+        geomlength = ArchGDAL.geomlength(data[:sg_street_geometry])
 
-        p1 = ArchGDAL.pointalongline(data[:edgegeom], 0.1 * geomlength)
+        p1 = ArchGDAL.pointalongline(data[:sg_street_geometry], 0.1 * geomlength)
         apply_wsg_84!(p1)
-        add_vertex!(g, Dict(:lon => ArchGDAL.getx(p1, 0), :lat => ArchGDAL.gety(p1, 0), :pointgeom => p1, :helper => true))
+        add_vertex!(g, Dict(:sg_osm_id => 0, :sg_lon => ArchGDAL.getx(p1, 0), :sg_lat => ArchGDAL.gety(p1, 0), :sg_geometry => p1, :sg_helper => true))
 
         id_1 = nv(g)
-        add_edge!(g, s, id_1, :helper, true)
+        add_edge!(g, s, id_1, :sg_helper, true)
 
-        p2 = ArchGDAL.pointalongline(data[:edgegeom], 0.6 * geomlength)
+        p2 = ArchGDAL.pointalongline(data[:sg_street_geometry], 0.6 * geomlength)
         apply_wsg_84!(p2)
-        add_vertex!(g, Dict(:lon => ArchGDAL.getx(p2, 0), :lat => ArchGDAL.gety(p2, 0), :pointgeom => p2, :helper => true))
+        add_vertex!(g, Dict(:sg_osm_id => 0, :sg_lon => ArchGDAL.getx(p2, 0), :sg_lat => ArchGDAL.gety(p2, 0), :sg_geometry => p2, :sg_helper => true))
         id_2 = nv(g)
-        add_edge!(g, id_2, d, :helper, true)
+        add_edge!(g, id_2, d, :sg_helper, true)
 
         add_edge_with_data!(g, id_1, id_2; data=data)
     elseif has_edge(g, s, d)
         #@warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
         # all of this is bad...
-        p = ArchGDAL.pointalongline(data[:edgegeom], 0.5 * ArchGDAL.geomlength(data[:edgegeom]))
+        p = ArchGDAL.pointalongline(data[:sg_street_geometry], 0.5 * ArchGDAL.geomlength(data[:sg_street_geometry]))
         apply_wsg_84!(p)
-        add_vertex!(g, Dict(:lon => ArchGDAL.getx(p, 0), :lat => ArchGDAL.gety(p, 0), :pointgeom => p, :helper => true))
-        add_edge!(g, s, nv(g), :helper, true)
+        add_vertex!(g, Dict(:sg_osm_id => 0, :sg_lon => ArchGDAL.getx(p, 0), :sg_lat => ArchGDAL.gety(p, 0), :sg_geometry => p, :sg_helper => true))
+        add_edge!(g, s, nv(g), :sg_helper, true)
         add_edge_with_data!(g, nv(g), d; data=data)
     else
         add_edge!(g, s, d)
@@ -353,36 +353,16 @@ end
     shadow_graph_from_light_osm_graph(g)
 
 transforms a `LightOSM.OSMGraph` into a `MetaDiGraph`, containing only the topologically relevant
-nodes and edges. Attached to every edge and node comes a lot of data, describing this specific edge or node:
+nodes and edges. Attached to every edge and node comes a lot of data, needed for future processing
+of the graph, preserving all information coming from open street maps (I think we throw away the node tags).
 
-# nodes
-in the case of helper nodes:
-- `:lat`
-- `:lon`
-- `pointgeom`
-- `:helper=true`
+The returned `MetaDiGraph` conforms to the requirements to be considered a shadow graph and used within
+the `MinistryOfCoolWalks` ecosystem.
 
-in the case of non helper nodes:
-- `:osm_id`
-- `:lat`
-- `:lon`
-- `pointgeom`
-- `:helper=false`
+All `props` prefixed with `sg_` are handled by functions within the `MinistryOfCoolWalks` ecosystem
+and should be considered read-only. Changing them directly might lead to unexpected behaviour.
 
-# edges
-in the case of helper edges:
-- `:helper=true`
-
-in the case of non helper edges:
-- `:osm_id`
-- `:tags` (tags of the original osm way, with parsed `width`, `lanes`, `lanes:forward`, `lanes:backward` and `lanes:both_ways`, `oneway` and `reverseway` keys)
-- `:edgegeom_base` (`ArchGDAL linestring` with the geometry of the edge. Should not be modified during subsequent operations.)
-- `:edgegeom` (copy of `:edgegeom_base`. This one will be modified during offsetting and such.)
-- `:full_length` (length of `edgegeom` in a projected crs)
-- `:parsing_direction` (direction in which we stepped through the original way nodes to get the linestring)
-- `:helper`=false 
-the props '[:osm_id, :tags, :edgegeom_base, :parsing_direction, :helper] are considered read-only.
-(Editing them might cause strange behaviour. Always duplicate the `:edgegeom_base` with `ArchGDAL.clone`)
+Always clone geometries with `ArchGDAL.clone` if you want to use them separate of the graph. (Check your references!)
 """
 function shadow_graph_from_light_osm_graph(g)
     # remove duplicate ways from node to way mapping (not sure if this is needed...)
@@ -401,17 +381,17 @@ function shadow_graph_from_light_osm_graph(g)
             point = ArchGDAL.createpoint(lon_point, lat_point)
             apply_wsg_84!(point)
             data = Dict(
-                :osm_id => osm_id,
-                :lon => lon_point,
-                :lat => lat_point,
-                :pointgeom => point,
-                :helper => false
+                :sg_osm_id => osm_id,
+                :sg_lon => lon_point,
+                :sg_lat => lat_point,
+                :sg_geometry => point,
+                :sg_helper => false
             )
             add_vertex!(g_nav, data)
         end
     end
 
-    osm_id_to_nav_id = Dict(get_prop(g_nav, i, :osm_id) => i for i in vertices(g_nav))
+    osm_id_to_nav_id = Dict(get_prop(g_nav, i, :sg_osm_id) => i for i in vertices(g_nav))
     osm_ids = collect(keys(osm_id_to_nav_id))
 
     rot_dir = 0.0
@@ -442,13 +422,13 @@ function shadow_graph_from_light_osm_graph(g)
                 linestring = geolinestring(g.nodes, edgegeom_as_nodes)
 
                 data = Dict(
-                    :osm_id => primitive_way.id,
-                    :tags => primitive_way.tags,
-                    :edgegeom => linestring,
-                    :edgegeom_base => ArchGDAL.clone(linestring),
-                    :full_length => 0.0,
-                    :parsing_direction => step_direction,
-                    :helper => false
+                    :sg_osm_id => primitive_way.id,
+                    :sg_tags => primitive_way.tags,
+                    :sg_street_geometry => linestring,
+                    :sg_geometry_base => ArchGDAL.clone(linestring),
+                    :sg_street_length => 0.0,
+                    :sg_parsing_direction => step_direction,
+                    :sg_helper => false
                 )
 
                 osm_src = edgegeom_as_nodes[1]
@@ -459,17 +439,17 @@ function shadow_graph_from_light_osm_graph(g)
     end
 
     # calculate center of the network and observatory
-    vertex_extent = geoiter_extent(get_prop(g_nav, v, :pointgeom) for v in vertices(g_nav))
+    vertex_extent = geoiter_extent(get_prop(g_nav, v, :sg_geometry) for v in vertices(g_nav))
     vertex_extent_center = extent_center(vertex_extent)
     obs = ShadowObservatory("ShadowGraphObservatory", vertex_extent_center.X, vertex_extent_center.Y, tz"Europe/Berlin")
 
     # set full length in local coordinates
-    project_local!((get_prop(g_nav, e, :edgegeom) for e in filter_edges(g_nav, :helper, false)), obs)
-    for e in filter_edges(g_nav, :helper, false)
-        projected_length = ArchGDAL.geomlength(get_prop(g_nav, e, :edgegeom))
-        set_prop!(g_nav, e, :full_length, projected_length)
+    project_local!((get_prop(g_nav, e, :sg_street_geometry) for e in filter_edges(g_nav, :sg_helper, false)), obs)
+    for e in filter_edges(g_nav, :sg_helper, false)
+        projected_length = ArchGDAL.geomlength(get_prop(g_nav, e, :sg_street_geometry))
+        set_prop!(g_nav, e, :sg_street_length, projected_length)
     end
-    project_back!(get_prop(g_nav, e, :edgegeom) for e in filter_edges(g_nav, :helper, false))
+    project_back!(get_prop(g_nav, e, :sg_street_geometry) for e in filter_edges(g_nav, :sg_helper, false))
 
 
     rot_dir == 0 && @warn "not rotational direction could be found. choosing right hand side driving."
@@ -482,12 +462,11 @@ function shadow_graph_from_light_osm_graph(g)
     end
 
     # apply all graph level metadata
-    set_prop!(g_nav, :crs, OSM_ref[])
-    set_prop!(g_nav, :offset_dir, rot_dir)
-    set_prop!(g_nav, :observatory, obs)
+    set_prop!(g_nav, :sg_crs, OSM_ref[])
+    set_prop!(g_nav, :sg_offset_dir, rot_dir)
+    set_prop!(g_nav, :sg_observatory, obs)
 
-
-    check_shadow_graph_integrity(g_nav)
+    check_shadow_graph_integrity(g_nav; strict=true)
     return g_nav
 end
 
