@@ -20,6 +20,19 @@ using BenchmarkTools
 
 gs = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike)
 
+draw(gs, p2; figure_params=Dict(:zoom_start => 4))
+
+p1 = [1, 785, 446, 1584, 1527, 49, 764, 1375, 115]  # normal edges
+p2 = [1692, 420, 1119, 533, 598, 5, 1632]  # helper nodes at start and end, edge 5 => 1632 is helper edge
+for i in [:vertices, :edges, :streets, :shadows, :sg_street_geometry, p1, p2]
+    try
+        draw(g, i; figure_params=Dict(:zoom_start => 14))
+        @test true
+    catch
+        @test "error thrown in plotting graph (from scratch) with $i"
+    end
+end
+
 
 props(gs, 1)
 
@@ -33,7 +46,7 @@ g_s2[2]
 tag = :full_length
 for e in filter_edges(g_s2[2], tag)
     p1 = get_prop(g_s1[2], e, tag)
-    p2 = get_prop(g_s2[2], e, tag) 
+    p2 = get_prop(g_s2[2], e, tag)
     if p1 != p2
         @warn p1 p2 e
         break
@@ -46,7 +59,7 @@ a2 = sum(filter_edges(g_s2[2], :full_length)) do e
     get_prop(g_s2[2], e, :full_length)
 end
 
-a1-a2
+a1 - a2
 
 g_light = graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
 
@@ -73,8 +86,6 @@ histogram(bearings, weights=lengths)
 extrema(bearings)
 
 -eps(0.0)
-
-angle(-1+)
 
 
 draw(g_shadow, :vertices)
@@ -324,6 +335,7 @@ ShadowGraphs.add_this_node(g_osm, 323203074)
 a = try
     a = [1, 2, 3][6]
 catch
+    3
 end
 a
 
@@ -338,5 +350,3 @@ draw!(fig, g, :edgegeom, opacity=0.5, weight=5)
 
 go = graph_from_file("rings.json", network_type=:bike)
 testway = go.ways[29399082]
-
-ShadowGraphs.get_node_list(testway, 323740118, [323740118], 1)
