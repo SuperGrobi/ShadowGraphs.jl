@@ -3,7 +3,7 @@
     width(tags)
 
 less opinionated version of the basic parsing `LightOSM` does, to parse the `width` tag of an osm way.
-Returns the parsed width if the tag exists or `missing` if not. If Values are negative, we take the absolute value.
+Returns the parsed width if the tag exists or `missing` if not. If values are negative, we take the absolute value.
 """
 function width(tags)
     width = get(tags, "width", missing)
@@ -244,6 +244,35 @@ function decompose_way_to_primitives(way::Way)
     return [Way(way.id, nodes, way.tags) for nodes in sub_nodes]
 end
 
+
+"""
+    get_all_node_lists(primitive_way, topological_osm_ids)
+
+get vector of vectors where each element contains the `osm_ids` between two topologically relevant nodes,
+in the same order as they occur in primitive way. Takes care of cyclical ways.
+
+Only use on primitive ways.
+"""
+function get_all_node_lists(primitive_way, topological_osm_ids)
+    all_nodes = is_circular_way(primitive_way) ? primitive_way.nodes[1:end-1] : primitive_way.nodes
+
+    @assert allunique(all_nodes) "somehow there are duplicates in the primitive way."
+
+    linked_topological_nodes = [node for node in all_nodes if node in topological_osm_ids]
+    topo_inds_in_all = [findfirst(==(i), all_nodes) for i in linked_topological_nodes]
+    all_edges_as_nodes = [all_nodes[a:b] for (a, b) in partition(topo_inds_in_all, 2, 1)]
+
+    if is_circular_way(primitive_way)
+        closing_inds_1 = topo_inds_in_all[end]:length(all_nodes)
+        closing_inds_2 = 1:topo_inds_in_all[1]
+        closing_edge = all_nodes[[closing_inds_1; closing_inds_2]]
+        push!(all_edges_as_nodes, closing_edge)
+    end
+
+    return all_edges_as_nodes
+end
+
+
 """
     geolinestring(nodes, node_id_list)
 
@@ -317,32 +346,7 @@ function add_edge_with_data!(g, s, d; data=Dict())
 end
 
 
-"""
-    get_all_node_lists(primitive_way, topological_osm_ids)
 
-get vector of vectors where each element contains the `osm_ids` between two topologically relevant nodes,
-in the same order as they occur in primitive way. Takes care of cyclical ways.
-
-Only use on primitive ways.
-"""
-function get_all_node_lists(primitive_way, topological_osm_ids)
-    all_nodes = is_circular_way(primitive_way) ? primitive_way.nodes[1:end-1] : primitive_way.nodes
-
-    @assert allunique(all_nodes) "somehow there are duplicates in the primitive way."
-
-    linked_topological_nodes = [node for node in all_nodes if node in topological_osm_ids]
-    topo_inds_in_all = [findfirst(==(i), all_nodes) for i in linked_topological_nodes]
-    all_edges_as_nodes = [all_nodes[a:b] for (a, b) in partition(topo_inds_in_all, 2, 1)]
-
-    if is_circular_way(primitive_way)
-        closing_inds_1 = topo_inds_in_all[end]:length(all_nodes)
-        closing_inds_2 = 1:topo_inds_in_all[1]
-        closing_edge = all_nodes[[closing_inds_1; closing_inds_2]]
-        push!(all_edges_as_nodes, closing_edge)
-    end
-
-    return all_edges_as_nodes
-end
 
 # ############# main entry point for graph construction ############## 
 """
