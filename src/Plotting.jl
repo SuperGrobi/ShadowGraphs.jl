@@ -4,20 +4,21 @@
 draws the given data series properies of the graph into a `Folium.jl` map.
 
 # arguments
-- fig::FoliumMap: map to draw in. (You can leave this argument out and let the folium callstack figure things out.)
-- g: shadow graph carying the data.
-- series_type: type of data to draw from the graph. Pick from: `:vertices`, `:edges`, `:streets`, `:shadows` or any edge property containing data we can draw with folium.
+- `fig::FoliumMap`: map to draw in. (You can leave this argument out and let the folium callstack figure things out.)
+- `g`: shadow graph carying the data.
+- `series_type`: type of data to draw from the graph. Pick from: `:vertices`, `:edges`, `:streets`, `:shadows` or any edge property containing data we can draw with folium.
 
 # keyword arguments
-- draw_arrows: if there should be a circle drawn 80% along the geometry. (only applies when `series_type` is `:streets`)
-- kwargs: keywords passed to folium for every element of `series_type`. (see the [python docs](https://python-visualization.github.io/folium/) and the [leaflet docs](https://leafletjs.com/reference.html) for a full list of all options.)
+- `draw_arrow`: if there should be a circle drawn 80% along the geometry. (only applies when `series_type` is `:streets`)
+- `kwargs`: keywords passed to folium for every element of `series_type`. (see the [python docs](https://python-visualization.github.io/folium/) and the [leaflet docs](https://leafletjs.com/reference.html) for a full list of all options.)
 
 Every `series_type` has a few sensible defaults set,
 most importantly the default tooltips and popups, which, by default show some interesting data about the vertices and edges, respectively.
+
 Currently, the `kwargs` are set for every element, there is (currently) no way to set individual parameters for each element.
 
 # returns
-- fig::FoliumMap (passthrough of argument)
+- `fig::FoliumMap` (passthrough of argument)
 """
 function Folium.draw!(fig::FoliumMap, g::T, series_type::Symbol; draw_arrows=true, kwargs...) where {T<:AbstractMetaGraph}
     @nospecialize
@@ -72,6 +73,9 @@ end
 
 draws the `path` given by node ids in `g` into `fig`. Uses the `:sg_geometry`-field of the nodes and the `:sg_street_geometry` field of the edges.
 `kwargs` are applied to both, cirles and lines. Does some fancy stuff to connect the lines when possible.
+
+returns
+`fig` (passthrough)
 """
 function Folium.draw!(fig::FoliumMap, g::T, path::AbstractVector; kwargs...) where {T<:AbstractMetaGraph}
     @nospecialize
