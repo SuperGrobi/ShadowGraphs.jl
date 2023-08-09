@@ -19,7 +19,8 @@ makedocs(;
         "Graph creation" => "BuildGraph.md",
         "IO" => "Persistence.md",
         "Plotting" => "Plotting.md",
-        "Projection" => "Projection.md"
+        "Projection" => "Projection.md",
+        "RTree Building" => "RTreeBuilding.md"
     ]
 )
 

@@ -35,6 +35,7 @@ export shadow_graph_from_object, shadow_graph_from_file, shadow_graph_from_downl
 include("BuildGraph.jl")
 
 include("Plotting.jl")
+include("RTreeBuilding.jl")
 
 export export_graph_to_csv, import_graph_from_csv
 include("Persistence.jl")

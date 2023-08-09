@@ -1,10 +1,13 @@
 @testitem "rtree for graphs" begin
+    using ArchGDAL, CoolWalksUtils, MetaGraphs, SpatialIndexing
+    cd(@__DIR__)
+
     rect_mask(x, y, dx, dy) = ArchGDAL.createpolygon([x, x + dx, x + dx, x, x], [y, y, y + dy, y + dy, y])
     g = shadow_graph_from_file("./data/test_clifton_bike.json"; network_type=:bike)
     mask1 = rect_mask(400.0, 350.0, 160.0, 140.0)
     mask2 = rect_mask(540.0, -450.0, 100.0, 100.0)
     project_local!(g)
-    foreach(m -> reinterp_crs!(m, get_prop(g, :crs)), [mask1, mask2])
+    foreach(m -> reinterp_crs!(m, get_prop(g, :sg_crs)), [mask1, mask2])
     rt = build_rtree(g)
 
     # large mask containing a lot of stuff around an intersection
