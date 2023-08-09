@@ -1,43 +1,41 @@
 """
 
-    project_local!(g::T, center_lon=get_prop(g, :center_lon), center_lat=get_prop(g, :center_lat)) where {T<:AbstractMetaGraph}
+    project_local!(g::T, obs::ShadowObservatory=get_prop(g, :sg_observatory)) where {T<:AbstractMetaGraph}
+    project_local!(g::T, lon, lat) where {T<:AbstractMetaGraph}
 
-projects all `ArchGDAL` geometry in the `props` of edges and nodes of `g` to transverse mercator, centered at `center_lon`, `center_lat`
-and updates the `:crs` properity of `g` accordingly. All geometry is assumed to be in the `:crs` system. Returns the projected `g`.
+projects all `ArchGDAL` geometry in the `props` of edges and nodes of `g` to transverse mercator, centered around the `obs` (or `lon`, `lat`)
+and updates the `:sg_crs` property of `g` accordingly. All geometry is assumed to be in the `:sg_crs` system. Returns the projected `g`.
 """
-function CoolWalksUtils.project_local!(g::T, center_lon=get_prop(g, :center_lon), center_lat=get_prop(g, :center_lat)) where {T<:AbstractMetaGraph}
-    projstring = "+proj=tmerc +lon_0=$center_lon +lat_0=$center_lat"
-    #println(projstring)
-    src = get_prop(g, :crs)
-    dest = ArchGDAL.importPROJ4(projstring)
-    ArchGDAL.createcoordtrans(trans -> project_graph_edges!(g, trans), src, dest)
-    ArchGDAL.createcoordtrans(trans -> project_graph_nodes!(g, trans), src, dest)
-    set_prop!(g, :crs, dest)
+CoolWalksUtils.project_local!(g::T, obs::ShadowObservatory=get_prop(g, :sg_observatory)) where {T<:AbstractMetaGraph} = project_local!(g, obs.lon, obs.lat)
+function CoolWalksUtils.project_local!(g::T, lon, lat) where {T<:AbstractMetaGraph}
+    src = get_prop(g, :sg_crs)
+    dst = CoolWalksUtils.crs_local(lon, lat)
+    ArchGDAL.createcoordtrans(trans -> _execute_edge_projection!(g, trans), src, dst)
+    ArchGDAL.createcoordtrans(trans -> _execute_node_projection!(g, trans), src, dst)
+    set_prop!(g, :sg_crs, dst)
     return g
 end
 
 """
-
     project_back!(g::T) where {T<:AbstractMetaGraph}
 
-projects all `ArchGDAL` geometry in the `props` of edges and nodes of `g` back to `EPSG4236` and updates the `:crs` property of `g` accordingly.
+projects all `ArchGDAL` geometry in the `props` of edges and nodes of `g` back to `EPSG4236` and updates the `:sg_crs` property of `g` accordingly.
 Returns `g`.
 """
 function CoolWalksUtils.project_back!(g::T) where {T<:AbstractMetaGraph}
-    src = get_prop(g, :crs)
-    ArchGDAL.createcoordtrans(trans -> project_graph_edges!(g, trans), src, OSM_ref[])
-    ArchGDAL.createcoordtrans(trans -> project_graph_nodes!(g, trans), src, OSM_ref[])
-    set_prop!(g, :crs, OSM_ref[])
+    src = get_prop(g, :sg_crs)
+    ArchGDAL.createcoordtrans(trans -> _execute_edge_projection!(g, trans), src, OSM_ref[])
+    ArchGDAL.createcoordtrans(trans -> _execute_node_projection!(g, trans), src, OSM_ref[])
+    set_prop!(g, :sg_crs, OSM_ref[])
     return g
 end
 
 """
-
-    project_graph_nodes!(g, trans)
+    _execute_node_projection!(g, trans)
 
 applies the `ArchGDAL` transformation `trans` to every `ArchGDAL` geometry in the `props` of the `nodes` of `g`.
 """
-function project_graph_nodes!(g, trans)
+function _execute_node_projection!(g, trans)
     for vertex in vertices(g)
         for value in values(props(g, vertex))
             if value isa ArchGDAL.IGeometry
@@ -48,12 +46,11 @@ function project_graph_nodes!(g, trans)
 end
 
 """
-
-    project_graph_edges!(g, trans)
+    _execute_edge_projection!(g, trans)
 
 applies the `ArchGDAL` transformation `trans` to every `ArchGDAL` geometry in the `props` of the `edges` of `g`.
 """
-function project_graph_edges!(g, trans)
+function _execute_edge_projection!(g, trans)
     for edge in edges(g)
         for value in values(props(g, edge))
             if value isa ArchGDAL.IGeometry
