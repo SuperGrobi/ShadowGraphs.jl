@@ -13,6 +13,9 @@ a set of requirements detailed below. To check if a graph fulfills the technical
 
 In general, all `props` handled by the `MinistryOfCoolWalks` ecosystem start with `sg_`.
 They are considered to be read-only. Setting them directly might lead to unexpected behaviour.
+
+The `weightfield` of the graph should be set to `:sg_street_length`, the `defaultweight` should be `0.0`.
+
 Remember to `ArchGDAL.clone` geometries if you want to use them independently of the graph, otherwise
 you might observe strange behaviour when mutating the graph (as you will only get a reference to the geometry from `get_prop(...)`).
 

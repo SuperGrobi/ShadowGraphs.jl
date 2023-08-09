@@ -106,7 +106,8 @@ function check_shadow_graph_integrity(g; strict=false)
         @assert length(props(g)) == length(needed_graph_props) "the graph has more props than required."
     end
 
-    @assert weightfield(g) == :sg_street_length
+    @assert weightfield(g) == :sg_street_length "the weightfield of the graph is not set to `:sg_street_length`"
+    @assert defaultweight(g) == 0.0 "the defaultweight of the graph is not set to 0.0"
 
     @info "complete. All good!"
 end
