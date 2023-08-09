@@ -312,7 +312,7 @@ function add_edge_with_data!(g, s, d; data=Dict())
     !haskey(data, :sg_street_geometry) && throw(KeyError("cant add edge, data has no key :sg_street_geometry."))
 
     if s == d  # if we are about to add a self-loop
-        #@warn "trying to add self loop for node $(get_prop(g, s, :osm_id)) ($s)"
+        #@warn "trying to add self loop for node $(get_prop(g, s, :sg_osm_id)) ($s)"
         geomlength = ArchGDAL.geomlength(data[:sg_street_geometry])
 
         p1 = ArchGDAL.pointalongline(data[:sg_street_geometry], 0.1 * geomlength)
@@ -330,7 +330,7 @@ function add_edge_with_data!(g, s, d; data=Dict())
 
         add_edge_with_data!(g, id_1, id_2; data=data)
     elseif has_edge(g, s, d)
-        #@warn "trying to add multi-edge from node $(get_prop(g, s, :osm_id)) ($s) to $(get_prop(g, d, :osm_id)) ($d)"
+        #@warn "trying to add multi-edge from node $(get_prop(g, s, :sg_osm_id)) ($s) to $(get_prop(g, d, :sg_osm_id)) ($d)"
         # all of this is bad...
         p = ArchGDAL.pointalongline(data[:sg_street_geometry], 0.5 * ArchGDAL.geomlength(data[:sg_street_geometry]))
         apply_wsg_84!(p)
@@ -371,7 +371,7 @@ function shadow_graph_from_light_osm_graph(g)
     # build clean graph containing only nodes for topologically relevant nodes
     g_nav = MetaDiGraph()
     defaultweight!(g_nav, 0.0)
-    weightfield!(g_nav, :full_length)
+    weightfield!(g_nav, :sg_street_length)
 
     # add only those nodes, which are relevant for topology
     for (osm_id, way_ids) in g.node_to_way

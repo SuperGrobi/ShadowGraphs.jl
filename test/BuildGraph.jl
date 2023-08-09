@@ -177,7 +177,7 @@ end
     @test ShadowGraphs.get_rotational_direction(straightway, nodes, -1) == 0
 
     g = shadow_graph_from_file("./data/test_clifton_bike.json", network_type=:bike)
-    @test get_prop(g, :offset_dir) == -1
+    @test get_prop(g, :sg_offset_dir) == -1
 end
 
 
@@ -339,15 +339,15 @@ end
     include("./utils/BuildGraphTestUtils.jl")
 
     function data(g, s, d)
-        xs = get_prop(g, s, :lon)
-        ys = get_prop(g, s, :lat)
-        xd = get_prop(g, d, :lon)
-        yd = get_prop(g, d, :lat)
+        xs = get_prop(g, s, :sg_lon)
+        ys = get_prop(g, s, :sg_lat)
+        xd = get_prop(g, d, :sg_lon)
+        yd = get_prop(g, d, :sg_lat)
         x = [xs, (xs + xd) / 2 + 0.3 * (indegree(g, d) + 1), (xs + xd) / 2 - 0.5 * (indegree(g, d) + 1), xd]
         y = [ys, (ys + yd) / 2 - 0.1 * (outdegree(g, s) + 1), (ys + yd) / 2 + 0.2 * (outdegree(g, s) + 1), yd]
         line = ArchGDAL.createlinestring(x, y)
         apply_wsg_84!(line)
-        return Dict(:a => 1, :b => 2, :edgegeom => line)
+        return Dict(:a => 1, :b => 2, :sg_street_geometry => line)
     end
 
     g = setup_addingraph()
@@ -374,8 +374,8 @@ end
     @test has_edge(g, 1, 6)
     @test has_edge(g, 6, 3)
 
-    @test get_prop(g, 6, :helper)
-    @test get_prop(g, 1, 6, :helper)
+    @test get_prop(g, 6, :sg_helper)
+    @test get_prop(g, 1, 6, :sg_helper)
     @test get_prop(g, 6, 3, :a) == 1
     @test get_prop(g, 6, 3, :b) == 2
 
@@ -388,10 +388,10 @@ end
     @test has_edge(g, 7, 8)
     @test has_edge(g, 8, 2)
 
-    @test get_prop(g, 7, :helper)
-    @test get_prop(g, 8, :helper)
-    @test get_prop(g, 2, 7, :helper)
-    @test get_prop(g, 8, 2, :helper)
+    @test get_prop(g, 7, :sg_helper)
+    @test get_prop(g, 8, :sg_helper)
+    @test get_prop(g, 2, 7, :sg_helper)
+    @test get_prop(g, 8, 2, :sg_helper)
 
     @test get_prop(g, 7, 8, :a) == 1
     @test get_prop(g, 7, 8, :b) == 2
@@ -413,22 +413,22 @@ end
     g = ShadowGraphs.shadow_graph_from_light_osm_graph(g_osm)
     @test g isa MetaDiGraph
     @test defaultweight(g) == 0.0
-    @test weightfield(g) == :full_length
+    @test weightfield(g) == :sg_street_length
     @test nv(g) == 1692
     @test ne(g) == 3758
     test_edges = first(edges(g), 5)
     for e in test_edges
-        @test has_prop(g, e, :full_length)
-        @test get_prop(g, e, :full_length) > 0
-        @test ArchGDAL.distance(get_prop(g, e, :edgegeom), get_prop(g, e, :edgegeom_base)) ≈ 0 atol = 1e-10
-        @test ArchGDAL.geomlength(get_prop(g, e, :edgegeom)) ≈ ArchGDAL.geomlength(get_prop(g, e, :edgegeom_base))
+        @test has_prop(g, e, :sg_street_length)
+        @test get_prop(g, e, :sg_street_length) > 0
+        @test ArchGDAL.distance(get_prop(g, e, :sg_street_geometry), get_prop(g, e, :sg_geometry_base)) ≈ 0 atol = 1e-10
+        @test ArchGDAL.geomlength(get_prop(g, e, :sg_street_geometry)) ≈ ArchGDAL.geomlength(get_prop(g, e, :sg_geometry_base))
     end
-    @test mapreduce(e -> has_prop(g, e, :edgegeom) && has_prop(g, e, :edgegeom_base), &, filter_edges(g, :helper, false))
+    @test mapreduce(e -> has_prop(g, e, :sg_street_geometry) && has_prop(g, e, :sg_geometry_base), &, filter_edges(g, :sg_helper, false))
 
     # test if all relevant props are set
-    @test has_prop(g, :crs)
-    @test has_prop(g, :offset_dir)
-    @test has_prop(g, :observatory)
+    @test has_prop(g, :sg_crs)
+    @test has_prop(g, :sg_offset_dir)
+    @test has_prop(g, :sg_observatory)
 end
 
 # USER FACING LOADER FUNCTIONS

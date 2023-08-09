@@ -13,8 +13,8 @@ function setup_addingraph()
     lats = [-3.9, -0.8, -6.4, 6.2]
     lons = [6.7, -3.6, 3.6, -2.4]
     for n in vertices(g)
-        set_prop!(g, n, :lon, lons[n])
-        set_prop!(g, n, :lat, lats[n])
+        set_prop!(g, n, :sg_lon, lons[n])
+        set_prop!(g, n, :sg_lat, lats[n])
     end
     add_vertex!(g)
     return g
