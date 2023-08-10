@@ -14,7 +14,7 @@ saves the shadow graph to a selection of csv files:
 - `"path"_nodes.csv`
 - `"path"_edges.csv`
 - `"path"_graph.csv` (contains graph properties)
-All `ArchGDAL` geometries are converted to WellKnownText.
+All `ArchGDAL` geometries are converted to `WellKnownText`.
 
 # arguments
 - `path`: path to the target directory. The different specifiers are appended to the filename given in this path.
@@ -26,9 +26,11 @@ All `ArchGDAL` geometries are converted to WellKnownText.
 - `graph_props`
 
 are used to select which of the `props` on each edge, vertex and graph should be exported. Each argument takes either:
-- `DataFrames.All()`: stores every property present. (inserts `missing` for all other properties.)
+- `DataFrames.All()`: stores every property present.
 - `DataFrames.Not([...])`: stores every porperty except for the property names passed as a vector to `Not`. (example: `Not([:sg_helper, :sg_geometry_base])`)
 - `[...]`: only exports the properties with names in the vector. (example: `[:sg_lon, :sg_lat, :sg_helper]`)
+
+If an element does not have the property, an empty cell gets inserted in the csv, but only if there is at least one element with the property.
 
 # returns
 saves multiple files to disk.
@@ -87,7 +89,7 @@ end
 """
     import_shadow_graph_from_csv(path)
 
-imports csvs saved via `export_shadow_graph_to_csv`. `path` points to the main name of the files (without suffixes).
+imports csv files saved with `export_shadow_graph_to_csv`. `path` points to the main name of the files (without suffixes).
 (Just plug in the same thing you plugged in to save the graph).
 
 # returns

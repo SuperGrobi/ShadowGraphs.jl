@@ -17,7 +17,7 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Graph creation" => "BuildGraph.md",
-        "IO" => "Persistence.md",
+        "Graph saving (and loading)" => "Persistence.md",
         "Plotting" => "Plotting.md",
         "Projection" => "Projection.md",
         "RTree Building" => "RTreeBuilding.md"
