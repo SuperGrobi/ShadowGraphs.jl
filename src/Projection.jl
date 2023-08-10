@@ -54,7 +54,7 @@ function _execute_edge_projection!(g, trans)
     for edge in edges(g)
         for value in values(props(g, edge))
             if value isa ArchGDAL.IGeometry
-                ArchGDAL.transform!(value::EdgeGeomType, trans)
+                ArchGDAL.transform!(value, trans)
             end
         end
     end
