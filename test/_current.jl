@@ -350,3 +350,20 @@ draw!(fig, g, :edgegeom, opacity=0.5, weight=5)
 
 go = graph_from_file("rings.json", network_type=:bike)
 testway = go.ways[29399082]
+
+a = 1
+
+"value = $a"
+f(x) = x^2
+
+gs = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike)
+
+export_shadow_graph_to_csv("./test/temp/gs", gs;)# edge_props=Not([:sg_helper, :sg_tags]), vertex_props=Not([:sg_helper, :sg_geometry]), graph_props=Not([:sg_crs]))
+
+nd, ed, gd, lg = import_shadow_graph_from_csv("./test/temp/gs")
+
+using ArchGDAL
+
+ArchGDAL.fromWKT("test")
+
+MetaDiGraph(:test, 0.0)

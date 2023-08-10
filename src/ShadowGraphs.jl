@@ -23,7 +23,6 @@ using IterTools
 
 # TODO: Rework Measures
 # TODO: Rework Persistence
-# TODO: Rework RTree
 
 const EdgeShadowGeomType = Union{ArchGDAL.IGeometry{ArchGDAL.wkbLineString},ArchGDAL.IGeometry{ArchGDAL.wkbMultiLineString}}
 const EdgeStreetGeomType = ArchGDAL.IGeometry{ArchGDAL.wkbLineString}
@@ -37,7 +36,7 @@ include("BuildGraph.jl")
 include("Plotting.jl")
 include("RTreeBuilding.jl")
 
-export export_graph_to_csv, import_graph_from_csv
+export export_shadow_graph_to_csv, import_shadow_graph_from_csv
 include("Persistence.jl")
 
 export tag_edge_bearings!, single_bearing
