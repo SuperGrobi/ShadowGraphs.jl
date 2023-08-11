@@ -367,3 +367,91 @@ using ArchGDAL
 ArchGDAL.fromWKT("test")
 
 MetaDiGraph(:test, 0.0)
+
+
+gs
+
+tag_edge_bearings!(gs)
+
+using LinearAlgebra
+using StatsBase
+
+bhist = ShadowGraphs.bearing_histogram(gs; binshift=-5)
+
+ShadowGraphs.bearing_histogram(gs; binshift=-5).edges[1][1]
+
+plot(bhist)
+
+b1 = normalize(bhist; mode=:pdf)
+b2 = normalize(bhist; mode=:density)
+b3 = normalize(bhist; mode=:probability)
+
+hists = [bhist, b1, b2, b3]
+
+ShadowGraphs.orientation_order.(hists)
+
+a = ShadowGraphs.orientation_order(b1)
+H = mapreduce(+, a...) do p, w
+    -w * p * log(p) 
+end
+
+b1.weights
+
+fusing Plots
+
+b1.edges
+
+plot!(bhist)
+
+
+
+sum(bnorm.weights)
+entropy(bnorm.weights)
+
+
+base_hist = fit(Histogram, rand(1:100, 1000), nbins=20)
+
+h1 = normalize(base_hist; mode=:pdf)
+h2 = normalize(base_hist; mode=:density)
+h3 = normalize(base_hist; mode=:probability)
+
+h1
+h4 = normalize(h1; mode=:probability)
+h2
+h5 = normalize(h2; mode=:probability)
+
+
+norm(h2)
+
+norm(base_hist)
+norm(h1)
+norm(h2)
+norm(h3)
+
+
+hist = fit(Histogram, rand([10, 100, 190, 280], 100000), 360 .* ((0:0.0000001:1)))
+
+nonlin_bins = range(0, 1, 11).^2 .* 360
+
+
+hist = fit(Histogram, 360 .* rand(100000), nonlin_bins)
+
+hn = normalize(hist, mode=:pdf)
+
+plot(hn)
+
+
+H = mapreduce(+, hn.weights, diff(hn.edges...)) do p, w
+    result = - w*p * log(p)
+    return iszero(p) ? zero(result) : result
+end
+
+
+3
+
+hc = normalize(hist, mode=:probability)
+
+H = mapreduce(+, hc.weights, diff(hn.edges...)) do P, w
+    result = - P * log(P/w)
+    return iszero(P) ? zero(result) : result
+end

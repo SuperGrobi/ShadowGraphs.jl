@@ -19,10 +19,10 @@ using CSV
 using Extents
 using TimeZones
 using IterTools
+using LinearAlgebra
 
 
 # TODO: Rework Measures
-# TODO: Rework Persistence
 
 const EdgeShadowGeomType = Union{ArchGDAL.IGeometry{ArchGDAL.wkbLineString},ArchGDAL.IGeometry{ArchGDAL.wkbMultiLineString}}
 const EdgeStreetGeomType = ArchGDAL.IGeometry{ArchGDAL.wkbLineString}
@@ -39,7 +39,7 @@ include("RTreeBuilding.jl")
 export export_shadow_graph_to_csv, import_shadow_graph_from_csv
 include("Persistence.jl")
 
-export tag_edge_bearings!, single_bearing
+export tag_edge_bearings!, bearing_histogram, orientation_entropy
 include("Measures.jl")
 
 
