@@ -22,8 +22,6 @@ using IterTools
 using LinearAlgebra
 
 
-# TODO: Rework Measures
-
 const EdgeShadowGeomType = Union{ArchGDAL.IGeometry{ArchGDAL.wkbLineString},ArchGDAL.IGeometry{ArchGDAL.wkbMultiLineString}}
 const EdgeStreetGeomType = ArchGDAL.IGeometry{ArchGDAL.wkbLineString}
 const VertexGeomType = ArchGDAL.IGeometry{ArchGDAL.wkbPoint}
