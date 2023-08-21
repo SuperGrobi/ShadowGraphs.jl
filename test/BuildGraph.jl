@@ -406,11 +406,11 @@ end
 
 # MAIN ENTRY POINT FOR GRAPH CONSTRUCTION
 @testitem "shadow_graph_from_light_osm_graph" begin
-    using MetaGraphs, Graphs, ArchGDAL, LightOSM
+    using MetaGraphs, Graphs, ArchGDAL, LightOSM, TimeZones
     cd(@__DIR__)
 
     g_osm = graph_from_file("./data/test_clifton_bike.json", network_type=:bike)
-    g = ShadowGraphs.shadow_graph_from_light_osm_graph(g_osm)
+    g = ShadowGraphs.shadow_graph_from_light_osm_graph(g_osm; timezone=tz"Europe/London")
     @test g isa MetaDiGraph
     @test defaultweight(g) == 0.0
     @test weightfield(g) == :sg_street_length
@@ -429,32 +429,40 @@ end
     @test has_prop(g, :sg_crs)
     @test has_prop(g, :sg_offset_dir)
     @test has_prop(g, :sg_observatory)
+    @test get_prop(g, :sg_observatory).tz == tz"Europe/London"
 end
 
 # USER FACING LOADER FUNCTIONS
 @testitem "shadow_graph_from_object" begin
-    using LightOSM, MetaGraphs, Graphs
+    using LightOSM, MetaGraphs, Graphs, TimeZones
     cd(@__DIR__)
 
     obj = LightOSM.file_deserializer("./data/test_clifton_bike.json")("./data/test_clifton_bike.json")
-    g = shadow_graph_from_object(obj, network_type=:bike)
+    g = shadow_graph_from_object(obj, network_type=:bike, timezone=tz"Europe/Berlin")
     @test g isa MetaDiGraph
     @test nv(g) == 1692
     @test ne(g) == 3758
+    @test get_prop(g, :sg_observatory).tz == tz"Europe/Berlin"
 end
 
 @testitem "shadow_graph_from_file" begin
-    using MetaGraphs, Graphs
+    using MetaGraphs, Graphs, TimeZones
     cd(@__DIR__)
 
     g = shadow_graph_from_file("./data/test_clifton_bike.json", network_type=:bike)
     @test g isa MetaDiGraph
     @test nv(g) == 1692
     @test ne(g) == 3758
+
+    @test get_prop(g, :sg_observatory).tz == tz"Europe/London"
+
+    g = shadow_graph_from_file("./data/test_clifton_bike.json", network_type=:bike, timezone=tz"Europe/Berlin")
+
+    @test get_prop(g, :sg_observatory).tz == tz"Europe/Berlin"
 end
 
 @testitem "shadow_graph_from_download" begin
-    using MetaGraphs, Graphs, CoolWalksUtils
+    using MetaGraphs, Graphs, CoolWalksUtils, TimeZones
 
     @rerun 15 begin
         g = shadow_graph_from_download(:bbox; minlat=52.89, minlon=-1.2, maxlat=52.92, maxlon=-1.165, network_type=:bike)
@@ -462,5 +470,15 @@ end
         # very weak test, but that is about as much as I can guarantee.
         @test nv(g) > 0
         @test ne(g) > 0
+        @test get_prop(g, :sg_observatory).tz == tz"Europe/London"
+    end
+
+    @rerun 15 begin
+        g = shadow_graph_from_download(:bbox; timezone=tz"America/New_York", minlat=52.89, minlon=-1.2, maxlat=52.92, maxlon=-1.165, network_type=:bike)
+        @test g isa MetaDiGraph
+        # very weak test, but that is about as much as I can guarantee.
+        @test nv(g) > 0
+        @test ne(g) > 0
+        @test get_prop(g, :sg_observatory).tz == tz"America/New_York"
     end
 end

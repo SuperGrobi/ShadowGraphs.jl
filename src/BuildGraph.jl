@@ -350,7 +350,7 @@ end
 
 # ############# main entry point for graph construction ############## 
 """
-    shadow_graph_from_light_osm_graph(g)
+    shadow_graph_from_light_osm_graph(g; timezone)
 
 transforms a `LightOSM.OSMGraph` into a `MetaDiGraph`, containing only the topologically relevant
 nodes and edges. Attached to every edge and node comes a lot of data, needed for future processing
@@ -362,9 +362,11 @@ the `MinistryOfCoolWalks` ecosystem.
 All `props` prefixed with `sg_` are handled by functions within the `MinistryOfCoolWalks` ecosystem
 and should be considered read-only. Changing them directly might lead to unexpected behaviour.
 
+`timezone` is used to set the `tz` field of the `ShadowObservatory`.
+
 Always clone geometries with `ArchGDAL.clone` if you want to use them separate of the graph. (Check your references!)
 """
-function shadow_graph_from_light_osm_graph(g)
+function shadow_graph_from_light_osm_graph(g; timezone)
     # remove duplicate ways from node to way mapping (not sure if this is needed...)
     g.node_to_way = Dict(key => unique(value) for (key, value) in g.node_to_way)
 
@@ -441,7 +443,7 @@ function shadow_graph_from_light_osm_graph(g)
     # calculate center of the network and observatory
     vertex_extent = geoiter_extent(get_prop(g_nav, v, :sg_geometry) for v in vertices(g_nav))
     vertex_extent_center = extent_center(vertex_extent)
-    obs = ShadowObservatory("ShadowGraphObservatory", vertex_extent_center.X, vertex_extent_center.Y, tz"Europe/Berlin")
+    obs = ShadowObservatory("ShadowGraphObservatory", vertex_extent_center.X, vertex_extent_center.Y, timezone)
 
     # set full length in local coordinates
     project_local!((get_prop(g_nav, e, :sg_street_geometry) for e in filter_edges(g_nav, :sg_helper, false)), obs)
@@ -477,7 +479,7 @@ get_raw_ways(osm_xml_object::XMLDocument) = LightOSM.osm_dict_from_xml(osm_xml_o
 
 
 """
-    shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict}; network_type::Symbol=:drive)
+    shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict}; network_type::Symbol=:drive, timezone)
 
 builds the shadow graph from an object holding the raw OSM data. This function is using the `graph_from_object`
 function from `LightOSM` to first build a `LightOSM.OSMGraph` object which, due to the opinionated parsing of tags
@@ -493,8 +495,9 @@ The in this way augmented graph gets then handed over to [`shadow_graph_from_lig
 - osm_data_object
 - network_type: type of network stored in osm_data_object. Options are the same as in `LightOSM`: 
 `:drive`, `:drive_service`, `:walk`, `:bike`, `:all`, `:all_private`, `:none`, `:rail`
+- `timezone`: timezone the streets are in.
 """
-function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict}; network_type::Symbol=:drive)
+function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict}; network_type::Symbol=:drive, timezone)
     raw_ways = deepcopy(get_raw_ways(osm_data_object))
     parsed_ways = parse_raw_ways(raw_ways, network_type)
 
@@ -508,12 +511,12 @@ function shadow_graph_from_object(osm_data_object::Union{XMLDocument,Dict}; netw
     for i in keys(g.ways)
         g.ways[i] = parsed_ways[i]
     end
-    return shadow_graph_from_light_osm_graph(g)
+    return shadow_graph_from_light_osm_graph(g; timezone)
 end
 
 # ########## main API for creating a shadow graph ################
 """
-    shadow_graph_from_file(file_path::String; network_type::Symbol=:drive)
+    shadow_graph_from_file(file_path::String; network_type::Symbol=:drive, timezone=tz"Europe/London")
 
 builds the shadow graph from a file containing OSM data. The file could have been downloaded with
 either `shadow_graph_from_download` or `LightOSM.download_osm_network`.
@@ -523,17 +526,18 @@ either `shadow_graph_from_download` or `LightOSM.download_osm_network`.
 - network_type: type of network stored in file. Options are the same as in `LightOSM`: 
 `:drive`, `:drive_service`, `:walk`, `:bike`, `:all`, `:all_private`, `:none`, `:rail`
 """
-function shadow_graph_from_file(file_path::String; network_type::Symbol=:drive)
+function shadow_graph_from_file(file_path::String; network_type::Symbol=:drive, timezone=tz"Europe/London")
 
     !isfile(file_path) && throw(ArgumentError("File $file_path does not exist"))
     deserializer = LightOSM.file_deserializer(file_path)
     obj = deserializer(file_path)
 
-    return shadow_graph_from_object(obj; network_type=network_type)
+    return shadow_graph_from_object(obj; network_type=network_type, timezone=timezone)
 end
 
 """
     function shadow_graph_from_download(download_method::Symbol;
+                                        timezone=tz"Europe/London",
                                         network_type::Symbol=:drive,
                                         metadata::Bool=false,
                                         download_format::Symbol=:json,
@@ -544,6 +548,7 @@ downloads and builds the shadow graph from OSM.
 
 # arguments
 - `download_method::Symbol`: Download method, choose from `:place_name`, `:bbox`, `:point`, `:polygon` and (added by this package) `:extent`.
+- `timezone`: Timezone the streets are in.
 - `network_type::Symbol=:drive`: Network type filter, pick from `:drive`, `:drive_service`, `:walk`, `:bike`, `:all`, `:all_private`, `:none`, `:rail`
 - `metadata::Bool=false`: Set true to return metadata.
 - `download_format::Symbol=:json`: Download format, either `:osm`, `:xml` or `json`.
@@ -584,6 +589,7 @@ downloads and builds the shadow graph from OSM.
 `MetaDiGraph` with topologically relevant nodes and edges and relevant data attached to every node and edge.
 """
 function shadow_graph_from_download(download_method::Symbol;
+    timezone=tz"Europe/London",
     network_type::Symbol=:drive,
     metadata::Bool=false,
     download_format::Symbol=:json,
@@ -604,5 +610,5 @@ function shadow_graph_from_download(download_method::Symbol;
         save_to_file_location=save_to_file_location;
         download_kwargs...)
 
-    return shadow_graph_from_object(obj; network_type=network_type)
+    return shadow_graph_from_object(obj; network_type=network_type, timezone=timezone)
 end
