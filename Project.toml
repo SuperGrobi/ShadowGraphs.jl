@@ -33,7 +33,7 @@ LightOSM = "0.2.8"
 LightXML = "0.9"
 MetaGraphs = "0.7"
 ProgressMeter = "1"
-StatsBase = "0.33"
+StatsBase = "0.34"
 julia = "1.9"
 
 [extras]
