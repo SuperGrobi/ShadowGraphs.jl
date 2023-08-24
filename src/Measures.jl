@@ -102,7 +102,6 @@ fulfills this condition. I am not sure if I would trust this value.
 function orientation_order(hist::Histogram)
     prob_hist = normalize(hist, mode=:pdf)
     bin_widths = diff(prob_hist.edges...)
-    @show bin_widths
     @assert allequal(bin_widths) "the entropy of the grid is only defined for constant bin width."
 
     H_min = -log(0.25) + log(first(bin_widths))
