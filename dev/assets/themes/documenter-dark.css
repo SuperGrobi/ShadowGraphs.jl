@@ -7700,3 +7700,15 @@ html.theme--documenter-dark {
       font-weight: bold; } }
   html.theme--documenter-dark .hljs-subst {
     color: #f8f8f2; }
+.docstring {
+    border-radius: 15px;
+    margin-bottom: 2.5em !important;
+}
+
+.docstring > header {
+    border-radius: 15px;
+}
+
+.content pre {
+    border-radius: 10px;
+}

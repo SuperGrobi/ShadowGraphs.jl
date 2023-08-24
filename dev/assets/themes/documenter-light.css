@@ -7736,3 +7736,15 @@ code.hljs {
 
 .hljs-strong {
   font-weight: bold; }
+.docstring {
+    border-radius: 15px;
+    margin-bottom: 2.5em !important;
+}
+
+.docstring > header {
+    border-radius: 15px;
+}
+
+.content pre {
+    border-radius: 10px;
+}
