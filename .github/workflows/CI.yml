@@ -24,6 +24,8 @@ jobs:
           - 'nightly'
         os:
           - ubuntu-latest
+          - windows-latest
+          - macOS-latest
         arch:
           - x64
     steps:
@@ -38,11 +40,14 @@ jobs:
                   ${{ secrets.COOLWALKSUTILS_PRIVATE_KEY }}
                   ${{ secrets.FOLIUM_PRIVATE_KEY }}
       - name: Clone CoolWalksUtils.jl
-        run: git clone https://github.com/SuperGrobi/CoolWalksUtils.jl
+        run: git clone https://github.com/SuperGrobi/CoolWalksUtils.jl ../CoolWalksUtils.jl
       - name: Clone Folium.jl
-        run: git clone https://github.com/SuperGrobi/Folium.jl
+        run: git clone https://github.com/SuperGrobi/Folium.jl ../Folium.jl
       - name: Install non-registered repos
-        run: julia --project -e 'using Pkg; Pkg.add([PackageSpec(; path="./Folium.jl"), PackageSpec(; path="./CoolWalksUtils.jl")])'
+        shell: julia --color=yes --project=. {0}
+        run: |
+          using Pkg
+          Pkg.add([PackageSpec(; path="../Folium.jl"), PackageSpec(; path="../CoolWalksUtils.jl")])
       - uses: julia-actions/cache@v1
       - uses: julia-actions/julia-buildpkg@v1
         env:
