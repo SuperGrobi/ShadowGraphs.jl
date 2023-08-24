@@ -37,6 +37,7 @@ LightXML = "0.9"
 MetaGraphs = "0.7"
 ProgressMeter = "1"
 StatsBase = "0.34"
+TimeZones = "1"
 julia = "1.9"
 
 [extras]
