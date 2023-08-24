@@ -13,7 +13,69 @@ using Colors
 using Folium
 using CoolWalksUtils
 
+using BenchmarkTools
+
+@benchmark shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike)
+@benchmark shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike)
+
+gs = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike)
+
+draw(gs, p2; figure_params=Dict(:zoom_start => 4))
+
+p1 = [1, 785, 446, 1584, 1527, 49, 764, 1375, 115]  # normal edges
+p2 = [1692, 420, 1119, 533, 598, 5, 1632]  # helper nodes at start and end, edge 5 => 1632 is helper edge
+for i in [:vertices, :edges, :streets, :shadows, :sg_street_geometry, p1, p2]
+    try
+        draw(g, i; figure_params=Dict(:zoom_start => 14))
+        @test true
+    catch
+        @test "error thrown in plotting graph (from scratch) with $i"
+    end
+end
+
+
+props(gs, 1)
+
 g_shadow = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
+g_s1 = shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike);
+g_s2 = shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike);
+
+g_s1[2]
+g_s2[2]
+
+tag = :full_length
+for e in filter_edges(g_s2[2], tag)
+    p1 = get_prop(g_s1[2], e, tag)
+    p2 = get_prop(g_s2[2], e, tag)
+    if p1 != p2
+        @warn p1 p2 e
+        break
+    end
+end
+
+e = Edge(32, 3034)
+
+a2 = sum(filter_edges(g_s2[2], :full_length)) do e
+    get_prop(g_s2[2], e, :full_length)
+end
+
+a1 - a2
+
+g_light = graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
+
+
+
+@profview shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike);
+@profview shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike);
+
+
+shadow_graph_from_file("test_nottingham_bike.json"; network_type=:bike);
+
+g_shadow
+
+
+a, b = geoiter_extent(get_prop(g_shadow, v, :pointgeom) for v in vertices(g_shadow))
+a
 
 g_shadow
 
@@ -24,8 +86,6 @@ histogram(bearings, weights=lengths)
 extrema(bearings)
 
 -eps(0.0)
-
-angle(-1+)
 
 
 draw(g_shadow, :vertices)
@@ -275,6 +335,7 @@ ShadowGraphs.add_this_node(g_osm, 323203074)
 a = try
     a = [1, 2, 3][6]
 catch
+    3
 end
 a
 
@@ -290,4 +351,107 @@ draw!(fig, g, :edgegeom, opacity=0.5, weight=5)
 go = graph_from_file("rings.json", network_type=:bike)
 testway = go.ways[29399082]
 
-ShadowGraphs.get_node_list(testway, 323740118, [323740118], 1)
+a = 1
+
+"value = $a"
+f(x) = x^2
+
+gs = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike)
+
+export_shadow_graph_to_csv("./test/temp/gs", gs;)# edge_props=Not([:sg_helper, :sg_tags]), vertex_props=Not([:sg_helper, :sg_geometry]), graph_props=Not([:sg_crs]))
+
+nd, ed, gd, lg = import_shadow_graph_from_csv("./test/temp/gs")
+
+using ArchGDAL
+
+ArchGDAL.fromWKT("test")
+
+MetaDiGraph(:test, 0.0)
+
+
+gs
+
+tag_edge_bearings!(gs)
+
+using LinearAlgebra
+using StatsBase
+
+bhist = ShadowGraphs.bearing_histogram(gs; binshift=-5)
+
+ShadowGraphs.bearing_histogram(gs; binshift=-5).edges[1][1]
+
+plot(bhist)
+
+b1 = normalize(bhist; mode=:pdf)
+b2 = normalize(bhist; mode=:density)
+b3 = normalize(bhist; mode=:probability)
+
+hists = [bhist, b1, b2, b3]
+
+ShadowGraphs.orientation_order.(hists)
+
+a = ShadowGraphs.orientation_order(b1)
+H = mapreduce(+, a...) do p, w
+    -w * p * log(p) 
+end
+
+b1.weights
+
+fusing Plots
+
+b1.edges
+
+plot!(bhist)
+
+
+
+sum(bnorm.weights)
+entropy(bnorm.weights)
+
+
+base_hist = fit(Histogram, rand(1:100, 1000), nbins=20)
+
+h1 = normalize(base_hist; mode=:pdf)
+h2 = normalize(base_hist; mode=:density)
+h3 = normalize(base_hist; mode=:probability)
+
+h1
+h4 = normalize(h1; mode=:probability)
+h2
+h5 = normalize(h2; mode=:probability)
+
+
+norm(h2)
+
+norm(base_hist)
+norm(h1)
+norm(h2)
+norm(h3)
+
+
+hist = fit(Histogram, rand([10, 100, 190, 280], 100000), 360 .* ((0:0.0000001:1)))
+
+nonlin_bins = range(0, 1, 11).^2 .* 360
+
+
+hist = fit(Histogram, 360 .* rand(100000), nonlin_bins)
+
+hn = normalize(hist, mode=:pdf)
+
+plot(hn)
+
+
+H = mapreduce(+, hn.weights, diff(hn.edges...)) do p, w
+    result = - w*p * log(p)
+    return iszero(p) ? zero(result) : result
+end
+
+
+3
+
+hc = normalize(hist, mode=:probability)
+
+H = mapreduce(+, hc.weights, diff(hn.edges...)) do P, w
+    result = - P * log(P/w)
+    return iszero(P) ? zero(result) : result
+end

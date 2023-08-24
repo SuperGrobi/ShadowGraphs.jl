@@ -3,23 +3,39 @@ trans(col, val::T) where {T<:ArchGDAL.ISpatialRef} = ArchGDAL.toWKT(val)
 trans(col, val) = val
 DataFrames.tryparse(::Type{T}, string::AbstractString) where {T<:AbstractDict} = string |> Meta.parse |> eval
 
+export_props(props, selector::AbstractVector) = filter(p -> first(p) in selector, props)
+export_props(props, ::All) = props
+export_props(props, selector::Not{Vector{Symbol}}) = filter(p -> !(first(p) in selector.skip), props)
+
 """
-    export_graph_to_csv(path, graph; remove_internal_data = false)
+    export_shadow_graph_to_csv(path, graph; edge_props=All(), vertex_props=All(), graph_props=All())
 
 saves the shadow graph to a selection of csv files:
 - `"path"_nodes.csv`
 - `"path"_edges.csv`
 - `"path"_graph.csv` (contains graph properties)
+All `ArchGDAL` geometries are converted to `WellKnownText`.
 
 # arguments
 - `path`: path to the target directory. The different specifiers are appended to the filename given in this path.
-- `graph`: shadow graph to save
-- `remove_internal_data`: whether to remove internal data used for future calculations. (set this to true, if you do not need to be able to reimport the graph into `ShadowGraphs.jl` and want just the relevant "exposed" data)
+- `graph::MetaDiGraph`: shadow graph to save.
+
+# keyword arguments
+- `edge_props`
+- `vertex_props`
+- `graph_props`
+
+are used to select which of the `props` on each edge, vertex and graph should be exported. Each argument takes either:
+- `DataFrames.All()`: stores every property present.
+- `DataFrames.Not([...])`: stores every porperty except for the property names passed as a vector to `Not`. (example: `Not([:sg_helper, :sg_geometry_base])`)
+- `[...]`: only exports the properties with names in the vector. (example: `[:sg_lon, :sg_lat, :sg_helper]`)
+
+If an element does not have the property, an empty cell gets inserted in the csv, but only if there is at least one element with the property.
 
 # returns
 saves multiple files to disk.
 """
-function export_graph_to_csv(path, graph; remove_internal_data=false)
+function export_shadow_graph_to_csv(path, graph; edge_props=All(), vertex_props=All(), graph_props=All())
     if contains(path, '/')
         lastslash = findlast(==('/'), path)
         file = path[lastslash+1:end]
@@ -36,51 +52,50 @@ function export_graph_to_csv(path, graph; remove_internal_data=false)
     node_df = DataFrame()
     for vertex in vertices(graph)
         vprop = props(graph, vertex)
-        vprop[:vertex_id] = vertex
-        push!(node_df, props(graph, vertex); cols=:union)
-    end
-    if remove_internal_data
-        cols_to_remove = ["pointgeom"]
-        cols_exist = names(node_df)
-        select!(node_df, Not([i for i in cols_to_remove if i in cols_exist]))
+        push!(node_df, export_props(vprop, vertex_props); cols=:union)
     end
 
     node_file = dir * filename * "_nodes.csv"
     CSV.write(node_file, node_df; transform=trans)
 
-
     edge_df = DataFrame()
     for edge in edges(graph)
         eprop = props(graph, edge)
-        eprop[:src_id] = src(edge)
-        eprop[:dst_id] = dst(edge)
+        @assert !(:src_id in keys(eprop)) "the key :src_id on edge $edge is reserved for export."
+        @assert !(:dst_id in keys(eprop)) "the key :dst_id on edge $edge is reserved for export."
+
+        eprop = export_props(eprop, edge_props)
         push!(edge_df, eprop; cols=:union)
     end
-    if remove_internal_data
-        cols_to_remove = ["tags", "shadowpartgeom", "shadowed_part_length", "parsing_direction", "geomlength", "shadowgeom_segmented"]#, "edgegeom_base"]
-        cols_exist = names(edge_df)
-        select!(edge_df, Not([i for i in cols_to_remove if i in cols_exist]))
-    end
+    edge_df.src_id = src.(edges(graph))
+    edge_df.dst_id = dst.(edges(graph))
 
     edge_file = dir * filename * "_edges.csv"
     CSV.write(edge_file, edge_df; transform=trans)
 
-
     graph_df = DataFrame()
-    push!(graph_df, props(graph); cols=:union)
+    push!(graph_df, export_props(props(graph), graph_props); cols=:union)
+
+    @assert !(has_prop(graph, :defaultweight)) "the key :defaultweight on the graph is reserved for export."
+    @assert !(has_prop(graph, :weightfield)) "the key :weightfield on the graph is reserved for export."
+
+    graph_df.defaultweight = [defaultweight(graph)]
+    graph_df.weightfield = [weightfield(graph)]
 
     graph_file = dir * filename * "_graph.csv"
     CSV.write(graph_file, graph_df; transform=trans)
 end
 
 """
+    import_shadow_graph_from_csv(path)
 
-    import_graph_from_csv(path)
-
-imports graph saved via export_graph_to_csv. `path` points to the main name of the files (without suffixes).
+imports csv files saved with `export_shadow_graph_to_csv`. `path` points to the main name of the files (without suffixes).
 (Just plug in the same thing you plugged in to save the graph).
+
+# returns
+- `edge_df, vertex_df, graph_df`: the loaded csv files as `DataFrames` to be further processed into whatever you need them to be.
 """
-function import_graph_from_csv(path)
+function import_shadow_graph_from_csv(path)
     if contains(path, '/')
         lastslash = findlast(==('/'), path)
         file = path[lastslash+1:end]
@@ -100,11 +115,16 @@ function import_graph_from_csv(path)
     graph_file = dir * filename * "_graph.csv"
 
     node_df = CSV.read(node_file, DataFrame)
-    edge_df = CSV.read(edge_file, DataFrame; types=Dict(:tags => Dict{String,Any}))
+    edge_df = CSV.read(edge_file, DataFrame)#; types=Dict(:tags => Dict{String,Any}))
     graph_df = CSV.read(graph_file, DataFrame)
 
     g = MetaDiGraph()
+    defaultweight!(g, graph_df.defaultweight[1])
+    weightfield!(g, Symbol(graph_df.weightfield[1]))
 
+    return edge_df, node_df, graph_df
+
+    # this code is kept around as a reference for possible future changes to the loading mechanism...
     for node in eachrow(node_df)
         pointgeom = ArchGDAL.fromWKT(node.pointgeom)
         apply_wsg_84!(pointgeom)
