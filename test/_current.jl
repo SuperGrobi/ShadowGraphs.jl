@@ -12,13 +12,25 @@ using PyCall
 using Colors
 using Folium
 using CoolWalksUtils
+using GeoInterface
 
 using BenchmarkTools
 
 @benchmark shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike)
+
+sum()
+
+
 @benchmark shadow_graph_from_file("../../data/nottingham/nottingham_bike_full.json"; network_type=:bike)
 
 gs = shadow_graph_from_file("test/data/test_clifton_bike.json"; network_type=:bike)
+pedestrianize!(gs)
+
+dir_edges = [e for e in edges(gs) if !has_edge(gs, reverse(e))]
+
+project_local!(gs)
+
+p1 = props(gs, dir_edges[3])
 
 draw(gs, p2; figure_params=Dict(:zoom_start => 4))
 

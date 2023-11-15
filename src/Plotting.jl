@@ -124,3 +124,5 @@ function Folium.draw!(fig::FoliumMap, g::T, path::AbstractVector; kwargs...) whe
     end
     return fig
 end
+
+graph_extent(g) = geoiter_extent(get_prop(g, v, :sg_geometry) for v in vertices(g))
