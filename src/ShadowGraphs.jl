@@ -31,6 +31,7 @@ include("Projection.jl")
 export shadow_graph_from_object, shadow_graph_from_file, shadow_graph_from_download
 include("BuildGraph.jl")
 
+export graph_extent
 include("Plotting.jl")
 include("RTreeBuilding.jl")
 
@@ -113,5 +114,8 @@ outedges(g, v) = Edge.(v, outneighbors(g, v))
 inedges(g, v) = Edge.(inneighbors(g, v), v)
 get_prop_default(g, e, p, default) = has_prop(g, e, p) ? get_prop(g, e, p) : default
 export outedges, inedges, get_prop_default
+
+export pedestrianize!
+include("Pedestrianization.jl")
 
 end  # module
