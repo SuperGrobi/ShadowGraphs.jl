@@ -19,6 +19,7 @@ makedocs(;
         "Graph creation" => "BuildGraph.md",
         "Graph saving (and loading)" => "Persistence.md",
         "Graph Measures" => "Measures.md",
+        "Pedestrianization"=> "Pedestrianization.md",
         "Plotting" => "Plotting.md",
         "Projection" => "Projection.md",
         "RTree Building" => "RTreeBuilding.md"

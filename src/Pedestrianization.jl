@@ -5,6 +5,9 @@ for every edge in g which has not a reverse edge, adds a reverse edge with
 reversed geometry (`:sg_geometry_base` and `sg_street_geometry`) and parsing
 direction `:sg_parsing_direction * -1` of the original one. For `:sg_helper`
 edges, adds only a key `:sg_helper=true` to the new reverse edge.
+
+Apply before centerline correction, as the new reverse geometry will be
+corrected in the other direction.
 """
 function pedestrianize!(g::MetaDiGraph)
     for e in filter_edges(g, :sg_helper, true)
