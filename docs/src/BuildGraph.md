@@ -1,6 +1,6 @@
 # Building Graphs
 ## Introduction
-We use `LightOSM.jl` as a basis to handle all the downloading, saving and importing of OSM data. We provide similar functions
+We use `LightOSM.jl` as a basis to handle all the downloading, saving and importing of OSM data. We provide functions
 for (down)loading graphs which should feel very similar to any user of `LightOSM`.
 
 The `LightOSM.OSMGraph` instance is parsed and simplified into a `MetaDiGraph`, preserving the topology of the original
